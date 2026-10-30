@@ -1,33 +1,30 @@
-<script setup lang="ts">
+<script lang="ts">
 /**
  * MotionPage — cinematic page shell used inside App.vue's AnimatePresence.
  *
  * Receives the directional transition spec from usePageMotion and applies it
- * as initial/animate/exit so exiting and entering pages never overlap
- * (mode="wait" at the call site guarantees sequencing). The shell also
- * exposes a named slot structure so each view can establish hierarchy before
- * its content finishes entering.
+ * as initial/animate/exit. `mode="wait"` at the call site guarantees an
+ * exiting page is fully removed before the next one mounts, so rapid
+ * navigation never leaves overlapping pages or stale content behind.
  */
-import { Motion } from 'motion-v'
+import { motion } from 'motion-v'
 import type { PageTransitionSpec } from '../transitions'
 
 interface Props {
   /** Directional transition spec (reduced-motion aware, from usePageMotion). */
   spec: PageTransitionSpec
-  as?: string
 }
 
-const props = withDefaults(defineProps<Props>(), { as: 'div' })
+defineProps<Props>()
 </script>
 
 <template>
-  <Motion
-    :as="props.as"
+  <motion.div
     :initial="spec.initial"
     :animate="spec.animate"
     :exit="spec.exit"
     class="h-full"
   >
     <slot />
-  </Motion>
+  </motion.div>
 </template>

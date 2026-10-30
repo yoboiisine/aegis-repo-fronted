@@ -1,21 +1,24 @@
-<script setup lang="ts">
+<script lang="ts">
 /**
  * MotionReveal — declarative scroll-triggered entrance wrapper.
  *
- * Uses motion-v `whileInView` + `inViewOptions` (verified against the
- * installed motion-v@2.9.0 declarations). Supports one-time and replayable
- * reveals, intensity variants, and collapses to a short opacity fade under
- * prefers-reduced-motion.
+ * Uses motion-v's `whileInView` + `inViewOptions` (verified against the
+ * installed motion-v@2.9.0 declarations). Supports one-time (`once`, default)
+ * and replayable reveals, a cinematic intensity option, and collapses to a
+ * short opacity-only fade under reduced motion.
+ *
+ * Dynamic element rendering uses an inline `component :is` map of concrete
+ * typed motion components (`motion.div`, `motion.section`, …) rather than
+ * forwarding a stringly-typed `as` prop through the generic `Motion`
+ * component — this keeps vue-tsc happy without any type assertions.
  */
 import { computed } from 'vue'
+import { motion } from 'motion-v'
 import { durations, easings } from '../tokens'
 import { useAppReducedMotion } from '../composables/useReducedMotion'
 
+type RevealTag = 'div' | 'section' | 'article' | 'header' | 'footer' | 'li' | 'span'
 
-// motion-v's `Motion` is a generic functional component whose type only
-// accepts literal tags at call sites; this alias preserves full typing while
-// letting us forward a dynamic `as` prop from our own components.
-const MotionEl = Motion as unknown as typeof Motion
 interface Props {
   /** Travel distance in px for the vertical entrance. */
   distance?: number
@@ -27,7 +30,8 @@ interface Props {
   delay?: number
   /** Stronger cinematic entrance. */
   cinematic?: boolean
-  as?: string
+  /** Rendered element tag. */
+  tag?: RevealTag
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -36,10 +40,12 @@ const props = withDefaults(defineProps<Props>(), {
   amount: 0.2,
   delay: 0,
   cinematic: false,
-  as: 'div',
+  tag: 'div',
 })
 
 const { reduced } = useAppReducedMotion()
+
+const el = computed(() => motion[props.tag])
 
 const hidden = computed(() =>
   reduced.value
@@ -51,25 +57,31 @@ const shown = computed(() => ({
   opacity: 1,
   y: 0,
   transition: {
-    duration: reduced.value ? durations.control : (props.cinematic ? durations.cinematic : durations.scrollReveal),
+    duration: reduced.value
+      ? durations.control
+      : props.cinematic
+        ? durations.cinematic
+        : durations.scrollReveal,
     delay: reduced.value ? 0 : props.delay,
     ease: easings.out,
   },
 }))
 
+// Replayable reveals animate back out when leaving the viewport; one-time
+// reveals simply stay put after their first entrance.
 const exitState = computed(() =>
   props.once || reduced.value ? undefined : { opacity: 0, y: -props.distance / 2 },
 )
 </script>
 
 <template>
-  <MotionEl
-    :as="props.as"
+  <component
+    :is="el"
     :initial="hidden"
     :while-in-view="shown"
     :exit="exitState"
     :in-view-options="{ once: props.once, amount: props.amount }"
   >
     <slot />
-  </Motion>
+  </component>
 </template>

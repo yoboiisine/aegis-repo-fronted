@@ -1,26 +1,22 @@
 /**
  * usePageMotion — coordinates directional page transitions with the
  * store-driven navigation model (Aegis has no vue-router; currentPage is a
- * Pinia ref). Tracks the previous destination to derive direction, and
- * exposes reduced-motion-aware transition specs.
+ * Pinia ref). Direction comes from the explicit nav-stack policy in
+ * `useNavStack` (deeper = forward, revisiting an earlier entry = back) rather
+ * than any assumption about sidebar ordering. Exposes reduced-motion-aware
+ * transition specs for AnimatePresence.
  */
 
-import { computed, readonly, ref, watch, type ComputedRef } from 'vue'
+import { computed, type ComputedRef } from 'vue'
 import { useVaultStore } from '@/stores/vaultStore'
-import {
-  directionBetween,
-  pageTransition,
-  type MotionDirection,
-  type PageTransitionSpec,
-} from '../transitions'
+import { pageTransition, type PageTransitionSpec } from '../transitions'
 import { useAppReducedMotion } from './useReducedMotion'
+import { useNavStack } from './useNavStack'
 import type { PageId } from '@/types'
 
 export interface PageMotionState {
   /** Current page key driving AnimatePresence. */
   pageKey: ComputedRef<PageId>
-  /** Direction of the most recent navigation (-1 back, 0 neutral, 1 forward). */
-  direction: ComputedRef<MotionDirection>
   /** Transition spec for the active page (reduced-motion aware). */
   transition: ComputedRef<PageTransitionSpec>
 }
@@ -28,20 +24,7 @@ export interface PageMotionState {
 export function usePageMotion(): PageMotionState {
   const store = useVaultStore()
   const { reduced } = useAppReducedMotion()
-
-  // Track previous page to infer spatial direction. Updated only after the
-  // route actually changes, so rapid repeated navigation stays consistent:
-  // each new page reads the immediately-preceding destination.
-  const previousPage = ref<PageId>(store.currentPage)
-  const currentDirection = ref<MotionDirection>(0)
-
-  watch(
-    () => store.currentPage,
-    (next, prev) => {
-      currentDirection.value = directionBetween(prev ?? previousPage.value, next)
-      previousPage.value = next
-    },
-  )
+  const { direction } = useNavStack()
 
   const transition = computed<PageTransitionSpec>(() => {
     if (reduced.value) {
@@ -52,12 +35,11 @@ export function usePageMotion(): PageMotionState {
         exit: { opacity: 0, transition: { duration: 0.15, ease: 'easeIn' } },
       }
     }
-    return pageTransition(currentDirection.value)
+    return pageTransition(direction.value)
   })
 
   return {
     pageKey: computed(() => store.currentPage),
-    direction: readonly(currentDirection) as ComputedRef<MotionDirection>,
     transition,
   }
 }

@@ -1,21 +1,20 @@
-<script setup lang="ts">
+<script lang="ts">
 /**
  * MotionStagger — group entrance choreography.
  *
- * Parent drives `variants` with staggerChildren; children are ordinary
- * `Motion` elements with matching variant names (see usage in views).
+ * Parent drives `variants` with staggerChildren; children are motion elements
+ * carrying the matching implicit variant names ("hidden" / "visible") via
+ * `MotionStaggerItem` (exported from this file's sibling usage in views).
  * Fires on mount (page-level sequences) or when scrolled into view,
- * depending on the `when` prop. Reduced motion collapses to a fade.
+ * depending on the `when` prop. Reduced motion collapses to a plain fade.
  */
 import { computed } from 'vue'
+import { motion } from 'motion-v'
 import { durations, easings, staggers } from '../tokens'
 import { useAppReducedMotion } from '../composables/useReducedMotion'
 
+type StaggerTag = 'div' | 'section' | 'ul' | 'ol' | 'nav' | 'header' | 'footer'
 
-// motion-v's `Motion` is a generic functional component whose type only
-// accepts literal tags at call sites; this alias preserves full typing while
-// letting us forward a dynamic `as` prop from our own components.
-const MotionEl = Motion as unknown as typeof Motion
 interface Props {
   /** Stagger interval override (seconds). Defaults to section cadence. */
   interval?: number
@@ -23,48 +22,56 @@ interface Props {
   when?: 'mount' | 'view'
   /** Delay before the first child enters (seconds). */
   delayChildren?: number
-  as?: string
+  /** Rendered element tag. */
+  tag?: StaggerTag
 }
 
 const props = withDefaults(defineProps<Props>(), {
   interval: staggers.section,
   when: 'mount',
   delayChildren: 0.05,
-  as: 'div',
+  tag: 'div',
 })
 
 const { reduced } = useAppReducedMotion()
+
+const el = computed(() => motion[props.tag])
 
 const parentVariants = computed(() => ({
   hidden: {},
   visible: {
     transition: {
-      staggerChildren: reduced.value ? 0 : props.interval,
-      delayChildren: reduced.value ? 0 : props.delayChildren,
+      staggerChildren: props.interval,
+      delayChildren: props.delayChildren,
     },
+  },
+  // Reduced-motion pair: parent fades as one unit, children move instantly.
+  fade: {
+    opacity: 1,
+    transition: { duration: durations.control, ease: easings.out },
   },
 }))
 
-const animateState = computed(() =>
-  props.when === 'mount' ? 'visible' : undefined,
+// Reduced motion collapses the whole group into a single quiet fade: parent
+// and children share one `fade` variant pair instead of spatial movement.
+const animateState = computed<string | undefined>(() =>
+  props.when === 'mount' ? (reduced.value ? 'fade' : 'visible') : undefined,
 )
 
-const inViewTarget = computed(() =>
-  props.when === 'view' ? 'visible' : undefined,
+const inViewTarget = computed<string | undefined>(() =>
+  props.when === 'view' ? (reduced.value ? 'fade' : 'visible') : undefined,
 )
 </script>
 
 <template>
-  <MotionEl
-    :as="props.as"
+  <component
+    :is="el"
     :variants="parentVariants"
-    :initial="'hidden'"
+    :initial="reduced ? { opacity: 0 } : 'hidden'"
     :animate="animateState"
     :while-in-view="inViewTarget"
     :in-view-options="{ once: true, amount: 0.15 }"
   >
     <slot />
-  </Motion>
+  </component>
 </template>
-
-
