@@ -29,6 +29,15 @@ const tones: Record<BadgeTone, { fg: string; bg: string; border: string }> = {
 
 const style = computed(() => {
   const t = tones[props.tone]
+  // Solid emphasis: fill with the tone's foreground color and flip to the
+  // theme-aware on-accent ink. Translucent (default) keeps bg/border tokens.
+  if (props.solid) {
+    return {
+      color: 'var(--text-on-accent)',
+      background: 'var(--gradient-accent)',
+      borderColor: 'transparent',
+    }
+  }
   return {
     color: t.fg,
     background: t.bg,

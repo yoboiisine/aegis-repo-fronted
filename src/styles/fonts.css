@@ -15,7 +15,9 @@
   font-style: normal;
   font-weight: 400 700;
   font-display: swap;
-  src: url('./assets/fonts/sora-400.woff2') format('woff2-variations');
+  /* Path is relative to this CSS file (src/styles/), resolved and hashed by
+     Vite at build time — no runtime-only asset references. */
+  src: url('../assets/fonts/sora-400.woff2') format('woff2-variations');
 }
 
 @font-face {
@@ -24,7 +26,7 @@
   /* Type scale uses 400–700; declare 300–700 for supporting light text. */
   font-weight: 300 700;
   font-display: swap;
-  src: url('./assets/fonts/inter-300_700.woff2') format('woff2-variations');
+  src: url('../assets/fonts/inter-300_700.woff2') format('woff2-variations');
 }
 
 @font-face {
@@ -32,5 +34,5 @@
   font-style: normal;
   font-weight: 400 500;
   font-display: swap;
-  src: url('./assets/fonts/jetbrains-mono-400.woff2') format('woff2-variations');
+  src: url('../assets/fonts/jetbrains-mono-400.woff2') format('woff2-variations');
 }

@@ -96,4 +96,15 @@ export interface CredentialFilters {
 
 export type ThemeMode = 'light' | 'dark';
 
-export type PageId = 'overview' | 'passwords' | 'api-keys' | 'security' | 'settings';
+export type PageId = 'overview' | 'passwords' | 'api-keys' | 'security' | 'settings'
+
+/**
+ * Non-application route surfaced for Phase 1 review only: the design-system
+ * showcase is mounted when the URL hash equals `#/design-system`. It is not
+ * part of the vault navigation model (PageId) and never renders app data.
+ */
+export const DESIGN_SYSTEM_HASH = '#/design-system'
+
+export function isDesignSystemRoute(hash: string): boolean {
+  return hash === DESIGN_SYSTEM_HASH
+}

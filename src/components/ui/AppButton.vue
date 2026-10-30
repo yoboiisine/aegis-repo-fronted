@@ -84,6 +84,7 @@ const styles = computed(() => {
 
 <template>
   <motion.button
+    type="button"
     :class="styles.class"
     :style="styles.style"
     :disabled="disabled || loading"

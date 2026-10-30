@@ -55,11 +55,14 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 let restoreOverflow = ''
+let previouslyFocused: HTMLElement | null = null
 
 watch(
   () => props.open,
   async (open) => {
     if (open) {
+      // Remember the invoking element so focus can be restored on close.
+      previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null
       restoreOverflow = document.body.style.overflow
       document.body.style.overflow = 'hidden'
       window.addEventListener('keydown', onKeydown, true)
@@ -68,13 +71,19 @@ watch(
     } else {
       document.body.style.overflow = restoreOverflow
       window.removeEventListener('keydown', onKeydown, true)
+      // Restore focus to the opener (if still in the document) when closing.
+      if (previouslyFocused?.isConnected) previouslyFocused.focus()
+      previouslyFocused = null
     }
   },
+  // immediate: handles `open=true` at mount time — without it the initial
+  // state would render the dialog but never lock scroll or move focus in.
+  { immediate: true },
 )
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown, true)
-  document.body.style.overflow = restoreOverflow || document.body.style.overflow
+  if (props.open) document.body.style.overflow = restoreOverflow
 })
 
 const scrimTransition = { duration: durations.control, ease: easings.inOut }

@@ -6,7 +6,7 @@
  * The sliding pill uses `springs.snappy` (layout transitions done with
  * transforms only — GPU-friendly, no layout thrash).
  */
-import { computed, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { motion } from 'motion-v'
 
 export interface TabItem {
@@ -26,15 +26,45 @@ const emit = defineEmits<{ 'update:modelValue': [id: string] }>()
 const listRef = ref<HTMLElement | null>(null)
 const activeId = computed(() => props.modelValue ?? props.tabs[0]?.id ?? '')
 
+/**
+ * Indicator geometry lives in reactive state — NOT in a computed that reads
+ * the DOM. A computed would be evaluated during setup (before mount, when
+ * measurements are zero) and would never re-evaluate on resize because DOM
+ * reads are not reactive dependencies. Instead we measure imperatively at
+ * mount, after tab/size changes (nextTick), and on container resize via a
+ * ResizeObserver, storing plain refs the template can render from.
+ */
+const indicatorLeft = ref(0)
+const indicatorWidth = ref(0)
+
 function rectOf(id: string): { left: number; width: number } {
-  const list = listRef.value?.querySelector<HTMLElement>(`[data-tab="${id}"]`)
-  if (!list || !listRef.value) return { left: 0, width: 0 }
-  const parentRect = listRef.value.getBoundingClientRect()
-  const r = list.getBoundingClientRect()
+  const list = listRef.value
+  const el = list?.querySelector<HTMLElement>(`[data-tab="${id}"]`)
+  if (!el || !list) return { left: 0, width: 0 }
+  const parentRect = list.getBoundingClientRect()
+  const r = el.getBoundingClientRect()
   return { left: r.left - parentRect.left, width: r.width }
 }
 
-const indicator = computed(() => rectOf(activeId.value))
+function measure() {
+  const r = rectOf(activeId.value)
+  indicatorLeft.value = r.left
+  indicatorWidth.value = r.width
+}
+
+let resizeObserver: ResizeObserver | null = null
+
+onMounted(() => {
+  measure()
+  if (listRef.value && typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(measure)
+    resizeObserver.observe(listRef.value)
+  }
+})
+
+onBeforeUnmount(() => resizeObserver?.disconnect())
+
+watch([activeId, () => props.tabs], () => void nextTick(measure))
 
 function select(id: string) {
   emit('update:modelValue', id)
@@ -56,12 +86,14 @@ function onKeydown(e: KeyboardEvent) {
     :style="{ background: 'var(--glass-bg-subtle)', borderColor: 'var(--border-subtle)' }"
     @keydown="onKeydown"
   >
-    <!-- Spring-tracked selection pill -->
+    <!-- Spring-tracked selection pill (hidden until first measurement so it
+         never flashes at zero width before onMounted runs) -->
     <motion.div
+      v-show="indicatorWidth > 0"
       class="absolute top-1 bottom-1 rounded-md"
-      :style="{ width: `${indicator.width}px` }"
+      :style="{ width: `${indicatorWidth}px` }"
       :initial="false"
-      :animate="{ x: indicator.left, transition: { type: 'spring', stiffness: 480, damping: 34, mass: 0.9 } }"
+      :animate="{ x: indicatorLeft, transition: { type: 'spring', stiffness: 480, damping: 34, mass: 0.9 } }"
       aria-hidden="true"
     >
       <div class="w-full h-full rounded-md" :style="{ background: 'var(--gradient-accent)', boxShadow: 'var(--shadow-sm)' }" />
