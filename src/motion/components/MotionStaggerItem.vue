@@ -1,4 +1,4 @@
-<script lang="ts">
+<script setup lang="ts">
 /**
  * MotionStaggerItem — child of MotionStagger.
  *

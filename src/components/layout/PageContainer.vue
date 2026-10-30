@@ -35,6 +35,19 @@ onBeforeUnmount(() => {
 const { scrollY } = useScroll({ container: computed(() => pageScroller.value) })
 const headerOpacity = useTransform(scrollY, [0, 140], [1, 0.35])
 const headerBlur = useTransform(scrollY, [0, 140], ['0px', '2px'])
+
+// Motion's MotionStyleProps mirrors motion-dom's key list, which omits
+// vendor-prefixed properties like WebkitBackdropFilter. Hoisting the object
+// out of the template makes it a non-fresh literal, so the extra -webkit-
+// prefix key passes the type check; motion-dom's style builder writes unknown
+// keys straight to the element style, so older Safari still gets the blur.
+const stickyStripStyle = {
+  opacity: headerOpacity,
+  backdropFilter: headerBlur,
+  WebkitBackdropFilter: headerBlur,
+  background: 'color-mix(in srgb, var(--surface-base) 78%, transparent)',
+  borderBottom: '1px solid var(--border-subtle)',
+}
 </script>
 
 <template>
@@ -45,13 +58,7 @@ const headerBlur = useTransform(scrollY, [0, 140], ['0px', '2px'])
     <motion.div
       v-if="!reduced"
       class="sticky top-0 z-10 shrink-0 h-10 pointer-events-none flex items-center justify-center"
-      :style="{
-        opacity: headerOpacity,
-        backdropFilter: headerBlur,
-        WebkitBackdropFilter: headerBlur,
-        background: 'color-mix(in srgb, var(--surface-base) 78%, transparent)',
-        borderBottom: '1px solid var(--border-subtle)',
-      }"
+      :style="stickyStripStyle"
       aria-hidden="true"
     >
       <slot name="sticky-title" />

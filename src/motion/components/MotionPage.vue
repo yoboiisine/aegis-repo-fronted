@@ -1,4 +1,4 @@
-<script lang="ts">
+<script setup lang="ts">
 /**
  * MotionPage — cinematic page shell used inside App.vue's AnimatePresence.
  *

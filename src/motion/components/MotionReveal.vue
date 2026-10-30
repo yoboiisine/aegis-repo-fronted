@@ -1,4 +1,4 @@
-<script lang="ts">
+<script setup lang="ts">
 /**
  * MotionReveal — declarative scroll-triggered entrance wrapper.
  *

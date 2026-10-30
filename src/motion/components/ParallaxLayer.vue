@@ -1,4 +1,4 @@
-<script lang="ts">
+<script setup lang="ts">
 /**
  * ParallaxLayer — decorative depth layer for atmospheric compositions.
  *
@@ -9,14 +9,18 @@
  * simply renders static). Intended only for decorative geometry — never for
  * functional content or credential data.
  */
-import { computed, type Ref } from 'vue'
+import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import { motion, useScroll, useSpring, useTransform } from 'motion-v'
 import { springs } from '../tokens'
 import { useAppReducedMotion } from '../composables/useReducedMotion'
 
 interface Props {
-  /** The scrolling element to measure. */
-  container: Ref<HTMLElement | undefined>
+  /**
+   * The scrolling element to measure.
+   * Accepts a ref, a getter, or a plain element — Vue templates unwrap
+   * top-level refs, so `:container="pageScroller"` arrives as the element.
+   */
+  container: MaybeRefOrGetter<HTMLElement | undefined>
   /** Travel in px across the full scroll range (negative moves upward). */
   distance?: number
 }
@@ -25,7 +29,9 @@ const props = withDefaults(defineProps<Props>(), { distance: 40 })
 
 const { reduced } = useAppReducedMotion()
 
-const { scrollYProgress } = useScroll({ container: computed(() => props.container.value) })
+// Recomputes when the container ref resolves (PageContainer mounts its
+// scroller element after this component's first render).
+const { scrollYProgress } = useScroll({ container: computed(() => toValue(props.container)) })
 
 const smooth = useSpring(scrollYProgress, {
   stiffness: springs.scroll.stiffness,

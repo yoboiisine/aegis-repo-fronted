@@ -1,4 +1,4 @@
-<script lang="ts">
+<script setup lang="ts">
 /**
  * ScrollProgressBar — scroll-linked progress indicator.
  *
@@ -7,22 +7,28 @@
  * Aegis's actual nested scroll container via the `container` ref prop — no
  * window-scroll assumptions, no manual scroll listeners.
  */
-import { computed, type Ref } from 'vue'
+import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import { motion, useScroll, useSpring } from 'motion-v'
 import { springs } from '../tokens'
 import { useAppReducedMotion } from '../composables/useReducedMotion'
 
 interface Props {
-  /** The scrolling element to measure (Aegis's PageContainer inner scroller). */
-  container: Ref<HTMLElement | undefined>
+  /**
+   * The scrolling element to measure (Aegis's PageContainer inner scroller).
+   * Accepts a ref, a getter, or a plain element — Vue templates unwrap
+   * top-level refs, so `:container="pageScroller"` arrives as the element.
+   */
+  container: MaybeRefOrGetter<HTMLElement | undefined>
 }
 
 const props = defineProps<Props>()
 
 const { reduced } = useAppReducedMotion()
 
-// useScroll accepts MaybeComputedElementRef — a plain ref is valid, no casts.
-const { scrollYProgress } = useScroll({ container: computed(() => props.container.value) })
+// useScroll accepts MaybeComputedElementRef — a computed ref is valid, no
+// casts. Recomputes when the container ref resolves (PageContainer mounts
+// its scroller element after this component's first render).
+const { scrollYProgress } = useScroll({ container: computed(() => toValue(props.container)) })
 
 const progress = useSpring(scrollYProgress, {
   stiffness: springs.scroll.stiffness,
