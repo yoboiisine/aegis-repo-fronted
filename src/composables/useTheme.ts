@@ -48,20 +48,19 @@ export function supportsViewTransitions(): boolean {
   return typeof document !== 'undefined' && 'startViewTransition' in document
 }
 
-/** Minimal typing for the view-transition proposal (avoids TS lib gaps). */
-interface DocumentWithViewTransition extends Document {
-  startViewTransition?: (callback: () => void) => { finished: Promise<void> }
-}
+/**
+ * The DOM lib now ships `startViewTransition` typings; feature-detection via
+ * `supportsViewTransitions()` is enough. No custom Document interface needed
+ * (extending Document would conflict with the built-in signature).
+ */
 
 /** Duration of the CSS-interpolation fallback, matching --duration-component. */
 const FALLBACK_TRANSITION_MS = 320
 
 /** Apply a theme change with a cinematic crossfade. */
 function applyThemeAnimated(mode: ThemeMode): void {
-  const doc = document as DocumentWithViewTransition
-
-  if (supportsViewTransitions() && typeof doc.startViewTransition === 'function') {
-    const transition = doc.startViewTransition(() => {
+  if (supportsViewTransitions() && typeof document.startViewTransition === 'function') {
+    const transition = document.startViewTransition(() => {
       applyTheme(mode)
     })
     // Never leave the promise unhandled (e.g. if the transition is skipped).

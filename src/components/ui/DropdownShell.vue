@@ -2,12 +2,20 @@
 /**
  * DropdownShell — unopinionated dropdown/menu presentation primitive.
  *
- * Provides: trigger slot + floating glass panel, click-outside dismissal,
- * auto-close on menu-item activation, Escape dismissal with focus return to
- * the trigger, and arrow-key roving focus over `[role="menuitem"]` children.
- * Consumers fill the menu slot; no data or action logic lives here.
+ * Trigger accessibility contract (WAI-ARIA menu pattern):
+ *   - By default the shell renders a real, focusable <button> as the trigger,
+ *     carrying aria-haspopup="menu", aria-expanded and aria-controls.
+ *   - Alternatively, pass your own control via the #trigger slot; it receives
+ *     `{ open, toggle, menuId }` slot props so YOU can bind
+ *     aria-haspopup / aria-expanded / aria-controls on the actual focusable
+ *     element. The shell no longer puts these attributes on a dead wrapper.
+ *
+ * Also provides: click-outside dismissal, auto-close on menu-item activation,
+ * Escape dismissal with focus return to the trigger, arrow-key roving focus
+ * over `[role="menuitem"]` children, and optional controlled open state.
  */
-import { nextTick, onUnmounted, ref, useId } from 'vue'
+import { computed, nextTick, onUnmounted, ref, useId, useTemplateRef, watch } from 'vue'
+import type { ComponentPublicInstance } from 'vue'
 import { motion, AnimatePresence } from 'motion-v'
 import { durations, easings, springs } from '@/motion/tokens'
 
@@ -16,16 +24,51 @@ interface Props {
   align?: 'start' | 'end'
   /** Panel width as CSS value. */
   width?: string
+  /** Controlled open state. Leave undefined for internal (uncontrolled) state. */
+  modelValue?: boolean
+  /** Label for the built-in trigger button (ignored when #trigger is used). */
+  triggerLabel?: string
+  /** Extra classes for the built-in trigger button. */
+  triggerClass?: string
 }
 
-withDefaults(defineProps<Props>(), { align: 'start', width: '12rem' })
+const props = withDefaults(defineProps<Props>(), {
+  align: 'start',
+  width: '12rem',
+  modelValue: undefined,
+  triggerLabel: 'Open menu',
+  triggerClass: undefined,
+})
 
-const emit = defineEmits<{ openChange: [open: boolean] }>()
+const emit = defineEmits<{
+  'update:modelValue': [open: boolean]
+  openChange: [open: boolean]
+}>()
 
-const open = ref(false)
+const internalOpen = ref(props.modelValue ?? false)
+const open = computed(() => props.modelValue ?? internalOpen.value)
+
+watch(
+  () => props.modelValue,
+  (v) => {
+    if (v !== undefined) internalOpen.value = v
+  },
+)
+
 const rootRef = ref<HTMLElement | null>(null)
 const panelRef = ref<HTMLElement | null>(null)
 const menuId = useId()
+
+// Built-in trigger element (template ref) and the control registered by a
+// custom #trigger consumer via `setTriggerRef`. Exactly one is active.
+const builtinTriggerRef = useTemplateRef<ComponentPublicInstance | HTMLElement>('builtinTrigger')
+const customTriggerRef = ref<HTMLElement | null>(null)
+
+function currentTrigger(): HTMLElement | null {
+  const raw = builtinTriggerRef.value as ComponentPublicInstance | HTMLElement | Element | null
+  const el = raw instanceof Element ? raw : (raw?.$el ?? null)
+  return ((el instanceof HTMLElement ? el : null) ?? customTriggerRef.value) as HTMLElement | null
+}
 
 /**
  * Menu-item selector. Each role gets its own `:not([disabled])` filter —
@@ -35,15 +78,10 @@ const MENU_ITEM_SELECTOR = ['[role="menuitem"]', '[role="menuitemradio"]', '[rol
   .map((s) => `${s}:not([disabled])`)
   .join(', ')
 
-function focusTrigger() {
-  rootRef.value
-    ?.querySelector<HTMLElement>('button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
-    ?.focus()
-}
-
 function setOpen(value: boolean) {
   if (open.value === value) return
-  open.value = value
+  internalOpen.value = value // keeps uncontrolled mode consistent
+  emit('update:modelValue', value)
   emit('openChange', value)
   if (value) {
     void nextTick(() => {
@@ -51,9 +89,27 @@ function setOpen(value: boolean) {
     })
   } else {
     // Return focus to the trigger control on keyboard/click dismissal so
-    // users are not dumped back to the top of the document.
-    focusTrigger()
+    // users are not dumped back to the top of the document. Prefer the
+    // registered trigger; fall back to the first focusable descendant of
+    // the root (custom-slot consumers that skip setTriggerRef).
+    currentTrigger()?.focus()
   }
+}
+
+function toggle() {
+  setOpen(!open.value)
+}
+
+/** Slot props exposed to #trigger so the real control can carry ARIA state. */
+const triggerSlotProps = {
+  open,
+  toggle,
+  menuId,
+  /** Register the consumer's focusable control for Escape/focus-return. */
+  setTriggerRef: (el: Element | ComponentPublicInstance | null) => {
+    const inst = (el as ComponentPublicInstance | null)?.$el ?? el
+    customTriggerRef.value = inst instanceof HTMLElement ? inst : null
+  },
 }
 
 function onDocPointer(e: PointerEvent) {
@@ -100,22 +156,28 @@ function onPanelKeydown(e: KeyboardEvent) {
   } else if (e.key === 'Tab') {
     setOpen(false)
   }
-}
-</script>
+}</script>
 
 <template>
   <div ref="rootRef" class="relative inline-block" @keydown="onRootKeydown">
-    <!--
-      Accessibility contract: the element rendered in the #trigger slot must
-      be a focusable control (button / AppIconButton). The wrapper is NOT the
-      accessible control, so aria-expanded/aria-haspopup are advisory here;
-      consumers who need them on the actual button can bind them from the
-      `openChange` event. Escape is handled at the root so it works no matter
-      which descendant holds focus.
-    -->
-    <div aria-haspopup="menu" :aria-expanded="open" @click="setOpen(!open)">
-      <slot name="trigger" />
-    </div>
+    <!-- Built-in accessible trigger: a real focusable button carrying the
+         full WAI-ARIA menu-button contract. -->
+    <button
+      v-if="!$slots.trigger"
+      ref="builtinTrigger"
+      type="button"
+      aria-haspopup="menu"
+      :aria-expanded="open"
+      :aria-controls="open ? menuId : undefined"
+      :class="triggerClass"
+      @click="toggle"
+    >
+      {{ triggerLabel }}
+    </button>
+
+    <!-- Custom trigger: the shell hands `open`, `toggle` and `menuId` to the
+         slot so the consumer's actual control binds the ARIA attributes. -->
+    <slot v-else name="trigger" v-bind="triggerSlotProps" />
 
     <AnimatePresence>
       <motion.div

@@ -1,323 +1,150 @@
-# Aegis Frontend — Product Identity & Motion Engineering Overhaul
+# Aegis Frontend — Cinematic Glassmorphism Design System
 
-## Executive Summary
+Premium, local-first password & API-key vault frontend. This repository currently
+contains **Phase 0 (reconnaissance/planning)** and **Phase 1 (visual foundation +
+design system)** deliverables: a complete token architecture, light/dark themes,
+glass-surface primitives, foundational UI components, a centralized motion system,
+animated theme switching, and a design-system showcase. No application features
+(auth, vault CRUD, backend integration) are implemented yet — by design.
 
-Successfully transformed Aegis from a generic dashboard into a premium desktop security application with:
+See `docs/PHASE0_RECONNAISSANCE.md` for the full technical assessment.
 
-- **Distinctive visual identity**: Quiet luxury × Precision engineering × Personal security
-- **Reorganized product architecture**: Passwords and API Keys as first-class features
-- **Sophisticated motion system**: Motion for Vue (motion-v) with page transitions and refined interactions
-- **Refined theme system**: Deep graphite dark mode and warm neutral light mode
-- **Professional information architecture**: Overview, Passwords, API Keys, Security, Settings
+## Visual Identity — Cinematic Glassmorphism
 
-## Design Philosophy
+Aegis feels like an atmospheric, purpose-built security instrument: layered
+translucent glass over a soft aurora backdrop, restrained golden lighting, and
+deep blue-tinted ink. Blur, gradient, glow and shadow are applied through a
+centralized recipe system (`a-glass--*`, tokens in `src/styles/tokens.css`) —
+never ad hoc per component.
 
-### Visual Identity
-**Quiet luxury × Precision engineering × Personal security**
+### Themes
 
-Aegis is designed as a sophisticated personal security instrument, not a conventional SaaS dashboard.
+Applied via `<html data-theme="light|dark">`; all colors resolve through semantic
+tokens so components never hardcode palette values.
 
-**Design characteristics:**
-- Strong typographic hierarchy with Inter font family
-- Carefully controlled whitespace and deliberate spacing
-- Deep graphite surfaces (#0a0a0b to #27272a) in dark mode
-- Warm neutrals (#fafaf9 to #e7e5e4) in light mode
-- Restrained accent colors (sophisticated indigo)
-- Subtle material depth through layered surfaces
-- Fine-grained visual details and purposeful iconography
-- Consistent interaction feedback
+**Light — "Glacier":** soft white/pale-blue backgrounds (`#eef4fc` base), layered
+blue-white surfaces, deep muted-blue ink (`--a-blue-ink-900 #16305e`), darker-blue
+accents (`--a-blue-500/400`), restrained gold hairlines (`--a-gold-600 #b98f3e`),
+delicate shadows, translucent light glass.
 
-**Avoided:**
-- Generic SaaS dashboard templates
-- Excessive glassmorphism
-- Repeated rounded rectangular cards
-- Unnecessary gradients and neon glows
-- Oversized dashboard statistics
-- Generic AI-generated aesthetics
+**Dark — "Midnight":** deep navy backgrounds (`#050a18` base), midnight-blue
+surface tiers, blue-tinted glass (`--glass-bg rgba(18,34,74,.55)` etc.), cool-blue
+accent lighting (`--a-blue-400 #6aa5ff`), controlled gold highlights
+(`--a-gold-500 #d9b36a`, `--gold-border`, `--shadow-gold`), high-contrast text.
+Not an inversion of light mode — its own designed identity.
 
-### Motion Engineering
+Key semantic tokens (both themes define these; see `src/styles/tokens.css`):
+`--surface-base/primary/secondary/tertiary`, `--glass-bg[-subtle/-elevated/-modal]`,
+`--glass-border`, `--text-primary/secondary/tertiary/on-accent`, `--accent-*`,
+`--gold*`, `--border-*`, `--shadow-*`, `--gradient-accent`,
+`--gradient-gold-hairline`, `--blur-xs…xl`, `--radius-*`, `--focus-ring`.
 
-**Page Transitions:**
-- Smooth entering and exiting with controlled opacity and spatial movement
-- Consistent timing (300ms) and easing curves ([0.16, 1, 0.3, 1])
-- Proper handling of rapidly changing routes
-- Reduced-motion support via `prefers-reduced-motion`
+### Theme switching
 
-**Component Interactions:**
-- Credential items: refined hover and selection response
-- Dialogs: natural enter/exit with scale and opacity
-- Buttons: immediate tactile feedback
-- Theme switch: graceful transition
-- Search: responsive feedback without distraction
-- Copy interactions: clear confirmation feedback
+`src/composables/useTheme.ts` is the single source of truth:
+- Pre-paint bootstrap inline script in `index.html` sets `data-theme` before first
+  frame (no wrong-theme flash); persists to localStorage; follows system preference.
+- `toggleTheme({ animate: true })` uses the **View Transitions API** (crossfade,
+  no layout shift) when available, with a `.theme-animating` CSS-interpolation
+  fallback elsewhere. Reduced-motion collapses both paths instantly.
+- `ThemeToggle.vue` provides the reusable animated switch (spring knob, icon
+  crossfade).
 
-**Motion Design System:**
-```css
---ease-out: cubic-bezier(0.16, 1, 0.3, 1)
---ease-in-out: cubic-bezier(0.4, 0, 0.2, 1)
---duration-fast: 150ms
---duration-normal: 250ms
---duration-slow: 400ms
---duration-page: 500ms
-```
+## Typography
 
-## Product Architecture
+Locally bundled variable fonts (WOFF2 in `src/assets/fonts/`, `@font-face` in
+`src/styles/fonts.css`) — **zero runtime dependency on external font services**:
 
-### Navigation Structure
-```
-Vault
-├── Overview          — Vault summary and recent activity
-├── Passwords         — Password management (first-class)
-├── API Keys          — API key management (first-class)
+| Register | Class | Font |
+|---|---|---|
+| Display / page titles | `.a-display`, `.a-title` | Sora |
+| Section headings | `.a-heading`, `.a-subheading` | Sora |
+| Body / supporting | `.a-body`, `.a-supporting` | Inter |
+| Labels / metadata | `.a-label`, `.a-meta` | Inter |
+| Technical identifiers | `.a-mono` | JetBrains Mono |
 
-System
-├── Security          — Session status and vault controls
-└── Settings          — Appearance and preferences
-```
+Sizes/weights come from the `--text-*` type scale in `tokens.css`; components use
+the classes above rather than arbitrary `text-[Npx]`.
 
-### Feature Breakdown
+## Glass Surfaces
 
-#### Overview
-- Credential statistics (passwords, API keys, total)
-- Recent activity feed with credential type indicators
-- Quick navigation to Passwords and API Keys
-- Synthetic activity data (clearly labeled as demonstration)
+One shared recipe (`.a-glass` + depth modifier) guarantees consistent background
+opacity, backdrop blur, border, inner highlight, shadow and radius:
 
-#### Passwords
-- Search and filtering by category
-- Sort by title, created, or updated
-- Credential list with refined hover states
-- Detail panel with secret reveal/copy
-- Create and edit workflows
-- Delete confirmation dialogs
-- Empty states and loading states
+`a-glass--subtle` · `a-glass--standard` · `a-glass--elevated` · `a-glass--modal` ·
+`a-glass--focused` · `a-glass--gold` (premium hairline variant).
+The ambient backdrop is `.a-aurora` (three slow-drifting blobs; static under
+reduced motion). Blur tiers are capped (`--blur-xs 6px … --blur-xl 40px`) to keep
+rendering cheap and text readable.
 
-#### API Keys (First-Class Feature)
-- Provider and service identification
-- Environment badges (production/staging/development)
-- Key metadata display (provider, project, expiration, last used)
-- Scopes and permissions
-- Secret reveal and copy with confirmation
-- Category and tag management
-- Full CRUD operations
+## Component Foundation (`src/components/ui/`, barrel: `@/components/ui`)
 
-#### Security
-- Session status (active, unlocked time, auto-lock timeout)
-- Manual vault lock
-- Recovery key information (prototype presentation)
-- Security-related preferences
+Unopinionated visual primitives only — no vault/business logic:
 
-#### Settings
-- Theme toggle (light/dark)
-- Application information
-- Framework details (Vue 3 + TypeScript)
-- Mode indicator (PROTOTYPE)
+- `AppButton` (variants: primary/secondary/danger/ghost/glass/gold; sizes sm/md/lg;
+  loading/disabled; explicit `type="button"`) and `AppIconButton`
+- `AppInput`, `AppPasswordInput` (visual primitives), `FieldGroup`
+- `AppBadge` (tones incl. gold/success/warning/danger; `solid` fill option),
+  `AppDivider`, `AppSpinner`, `EmptyState`, `KeyValue`
+- `GlassPanel`, `Card` — glass-depth containers
+- `ModalShell` (focus trap, Escape, scroll lock, focus restore, immediate-open),
+  `DropdownShell` (WAI-ARIA menu pattern — see below), `AppTabs` (measured sliding
+  pill, ResizeObserver-correct), `AppTooltip`, `AppDialog`, `AppToasts`
+- `ThemeToggle`
 
-## Theme System
+**DropdownShell trigger contract:** by default it renders a real focusable
+`<button>` carrying `aria-haspopup="menu"`, `aria-expanded` and `aria-controls`.
+With a custom `#trigger` slot, the shell exposes `{ open, toggle, menuId,
+setTriggerRef }` slot props so your actual control binds the ARIA attributes
+(`setTriggerRef` registers it for Escape/focus-return). The old dead-wrapper
+attributes are gone. Example usage lives in the showcase.
 
-### Dark Mode — Deep Graphite
-```css
---surface-base: #0a0a0b
---surface-primary: #111113
---surface-secondary: #18181b
---surface-tertiary: #1f1f23
---text-primary: #fafafa
---text-secondary: #a1a1aa
---accent-primary: #6366f1 (indigo)
-```
+Icons: `lucide-vue-next` only, passed as components with a consistent size
+convention (11–16px inline, via `:size`).
 
-### Light Mode — Warm Neutrals
-```css
---surface-base: #fafaf9
---surface-primary: #ffffff
---surface-secondary: #f5f5f4
---surface-tertiary: #e7e5e4
---text-primary: #1c1917
---text-secondary: #57534e
---accent-primary: #4f46e5 (refined indigo)
-```
+## Motion System (`src/motion/`)
 
-**Theme Features:**
-- System preference detection with user override
-- Flicker-free initialization (inline script)
-- Smooth transitions between themes
-- Consistent across all components
-- Accessible contrast ratios
-- Reduced-motion support
+Centralized on `motion-v` with tokens in `tokens.ts`:
+- `durations`: micro 0.15s · control 0.22s · component 0.3s · panel 0.38s (+ page)
+- `easings`: out `[0.16,1,0.3,1]` · inOut · in
+- `springs`: snappy · smooth · dialog
+- `presets.ts` interaction bundles: `buttonInteraction`, `cardInteraction`,
+  `navItemInteraction`, `confirmPop`, `atmosphereEnter`, `emblemPulse`,
+  `themeSurfaceTransition`, `verifySweep` — plus existing page/stagger transitions.
 
-## Technical Implementation
+Components consume presets (`v-bind="buttonInteraction"` etc.) instead of
+hand-rolling animation objects. Only GPU-friendly transform/opacity animate; no
+decorative loops beyond the capped aurora drift.
 
-### Framework & Dependencies
-- **Vue 3.5** with Composition API and `<script setup>`
-- **TypeScript** in strict mode
-- **Vite** for build tooling
-- **Pinia** for state management
-- **Motion for Vue (motion-v)** for animations
-- **Tailwind CSS** for utility classes
-- **Lucide Vue Next** for icons
+**Reduced motion:** `useAppReducedMotion()` (JS side) drops interaction bundles
+and switches state animations to instant; `global.css` neutralizes CSS
+transitions/animations, aurora drift and view-transition duration under
+`prefers-reduced-motion`. Functional rotation (spinner) is intentionally kept.
 
-### Architecture
-```
-src/
-├── app/
-│   └── App.vue                    # Root with motion-v page transitions
-├── components/
-│   ├── layout/
-│   │   └── AppSidebar.vue         # Navigation with grouped sections
-│   ├── ui/
-│   │   ├── AppButton.vue          # Reusable button variants
-│   │   ├── AppDialog.vue          # Confirmation dialogs
-│   │   └── AppToasts.vue          # Notification system
-│   └── vault/
-│       ├── CredentialList.vue     # Shared list component
-│       └── CredentialForm.vue     # Create/edit forms
-├── composables/
-│   └── useTheme.ts                # Theme management
-├── features/
-│   ├── overview/
-│   │   └── OverviewView.vue       # Dashboard
-│   ├── passwords/
-│   │   └── PasswordsView.vue      # Password management
-│   ├── apikeys/
-│   │   └── ApiKeysView.vue        # API key management
-│   ├── security/
-│   │   └── SecurityView.vue       # Security controls
-│   ├── settings/
-│   │   └── SettingsView.vue       # Preferences
-│   └── vault/
-│       └── UnlockView.vue         # Unlock/recovery
-├── services/
-│   ├── api/
-│   │   ├── contracts.ts           # Service interfaces
-│   │   └── vaultClient.ts         # Active client
-│   └── mock/
-│       ├── fixtures.ts            # Synthetic data
-│       └── mockVaultClient.ts     # Mock adapter
-├── stores/
-│   └── vaultStore.ts              # Pinia store
-├── styles/
-│   ├── tokens.css                 # Design tokens
-│   └── global.css                 # Global styles
-├── types/
-│   └── index.ts                   # TypeScript definitions
-└── main.ts                        # Entry point
-```
+## Design-System Preview
 
-### State Management
-- **Pinia store** for centralized vault state
-- **Reactive computed properties** for filtered/sorted data
-- **Async actions** for all service operations
-- **Notification system** with auto-dismiss
-- **Theme state** with localStorage persistence (separate from vault data)
+Open **`/#/design-system`** (dev or built site). It mounts
+`src/design-system/DesignSystemPreview.vue` instead of the vault shell and
+demonstrates both themes, typography hierarchy, palette, glass depths, borders/
+shadows, every UI primitive with hover/focus/disabled states, modal/dropdown/tabs
+presentation, motion examples, and the animated theme transition. It is a review
+surface, not app navigation (`isDesignSystemRoute()` in `src/types/index.ts`).
 
-### Service Boundary
-Typed `VaultClient` interface enables clean swap between:
-- **Mock adapter**: In-memory synthetic data for development
-- **HTTP client**: Real backend integration (pending)
-
-## Security Practices
-
-✅ **No master passphrase stored after unlock**  
-✅ **No encryption keys in browser storage**  
-✅ **Secrets masked by default**  
-✅ **Revealed state cleared on vault lock**  
-✅ **No fake cryptographic operations claimed**  
-✅ **Mock adapter clearly identified as development-only**  
-✅ **No sensitive data in URLs or logs**  
-✅ **Clipboard operations with clear feedback**  
-✅ **Session management with auto-lock**  
-
-## Build Results
-
-```
-✓ Production build successful
-✓ Bundle: 319.33 KB JS (101.86 KB gzipped), 24.25 KB CSS (5.64 KB gzipped)
-✓ TypeScript strict mode, no errors
-✓ Zero React references (React scaffold and unused dependencies removed)
-✓ Motion for Vue fully integrated
-```
-
-## Development Commands
+## Development
 
 ```bash
-npm install          # Install dependencies
-npm run dev          # Start development server (http://localhost:3000)
-npm run build        # Production build
-npm run typecheck    # TypeScript validation
+npm install
+npm run dev        # http://localhost:3000  (showcase: /#/design-system)
+npm run build      # production build (Vite)
+npm run typecheck  # vue-tsc strict validation
 ```
 
-## Key Improvements from Previous Version
+Stack: Vue 3.5 · Vite 6 · TypeScript (strict) · Tailwind CSS v4 · motion-v ·
+Pinia · lucide-vue-next. Fonts and all assets bundled locally.
 
-### Before
-- Generic dashboard structure
-- Credentials as single undifferentiated list
-- No motion library (React framer-motion incompatible)
-- Basic theme implementation
-- Simple navigation (Dashboard, Credentials, Settings)
-- Template-driven aesthetic
+## Status & Boundaries
 
-### After
-- Distinctive product identity
-- Passwords and API Keys as first-class features
-- Motion for Vue with sophisticated transitions
-- Refined theme system with design tokens
-- Professional information architecture
-- Premium desktop application feel
-
-## Known Limitations
-
-1. **Backend Integration**: Mock adapter only — real backend pending
-2. **Recovery Flow**: UI presented but not functional (requires backend)
-3. **Session Timeout**: Displayed but not enforced (requires backend)
-4. **Clipboard Security**: Cannot reliably clear OS clipboard (browser limitation)
-5. **Cryptographic Operations**: All performed by backend (frontend is UI only)
-
-## Integration Notes
-
-### For Backend Integration
-Replace `src/services/api/vaultClient.ts` to point to real HTTP endpoints:
-
-```typescript
-export const vaultClient: VaultClient = {
-  async getVaultStatus() {
-    const response = await fetch('/api/vault/status');
-    return response.json();
-  },
-  async listPasswords() {
-    const response = await fetch('/api/credentials?type=password');
-    return response.json();
-  },
-  async listApiKeys() {
-    const response = await fetch('/api/credentials?type=api-key');
-    return response.json();
-  },
-  // ... implement other methods
-};
-```
-
-### For Monorepo Integration
-The frontend is self-contained and can be copied into the Aegis monorepo at `apps/web/` or similar location. All dependencies are standard npm packages compatible with pnpm workspaces.
-
-## Verification Results
-
-✅ **Build**: Production build successful  
-✅ **TypeScript**: Strict mode, no errors  
-✅ **React Removal**: Dead React scaffold (`App.tsx`, `main.tsx`, `index.css`) and unused dependencies removed  
-✅ **Motion Integration**: Motion for Vue fully functional  
-✅ **Theme System**: Light and dark modes fully implemented  
-✅ **Security**: No sensitive data persisted in browser storage  
-✅ **Navigation**: Professional information architecture  
-✅ **Features**: Passwords and API Keys as first-class citizens  
-✅ **Transitions**: Page transitions with motion-v  
-✅ **Interactions**: Refined component feedback  
-
-## Conclusion
-
-Aegis has been transformed from a generic dashboard into a premium desktop security application with a distinctive visual identity, sophisticated motion system, and professional information architecture. The application treats passwords and API keys as first-class features with appropriate workflows and metadata display.
-
-**Status**: ✅ Complete and verified  
-**Build**: ✅ Successful  
-**TypeScript**: ✅ Strict mode, no errors  
-**Themes**: ✅ Light and dark modes fully functional  
-**Motion**: ✅ Motion for Vue integrated  
-**Architecture**: ✅ Professional product structure
+Phase 1 complete: tokens, both themes, glass primitives, UI foundation, motion
+system, theme infrastructure, showcase. Phase 2 (application screens) must build
+on these primitives. Backend contracts (`src/services/api/contracts.ts`) remain
+untouched; mock client stays clearly development-only.

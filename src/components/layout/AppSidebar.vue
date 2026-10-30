@@ -159,7 +159,7 @@ async function handleLock() {
           </span>
         </div>
         <motion.button
-          @click="toggleTheme"
+          @click="toggleTheme({ animate: true })"
           v-bind="reduced ? {} : iconButtonInteraction"
           class="p-1.5 rounded-md cursor-pointer hover:bg-[var(--surface-tertiary)] transition-colors"
           :style="{ color: 'var(--text-tertiary)' }"

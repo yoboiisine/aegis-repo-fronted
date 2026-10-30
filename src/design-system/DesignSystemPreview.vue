@@ -163,8 +163,14 @@ function replayStagger() {
           <AppTooltip><template #trigger><AppIconButton :icon="Trash2" label="Delete" tone="danger" /></template>Delete credential</AppTooltip>
           <AppTooltip><template #trigger><AppIconButton :icon="Settings2" label="Settings" /></template>Options</AppTooltip>
           <DropdownShell align="start" width="11rem">
-            <template #trigger>
-              <AppButton variant="ghost"><MoreHorizontal :size="14" /> Menu</AppButton>
+            <template #trigger="{ open: menuOpen, toggle: toggleMenu, menuId: id }">
+              <AppButton
+                variant="ghost"
+                :aria-haspopup="'menu'"
+                :aria-expanded="menuOpen"
+                :aria-controls="menuOpen ? id : undefined"
+                @click="toggleMenu"
+              ><MoreHorizontal :size="14" /> Menu</AppButton>
             </template>
             <div role="menuitem" tabindex="0" class="px-2.5 py-1.5 rounded-md text-[12px] cursor-pointer hover:bg-[var(--surface-tertiary)]" :style="{ color: 'var(--text-secondary)' }">Reveal secret</div>
             <div role="menuitem" tabindex="0" class="px-2.5 py-1.5 rounded-md text-[12px] cursor-pointer hover:bg-[var(--surface-tertiary)]" :style="{ color: 'var(--text-secondary)' }">Copy identifier</div>
