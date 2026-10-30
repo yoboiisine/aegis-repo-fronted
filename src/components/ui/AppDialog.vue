@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue';
-import { Motion } from 'motion-v';
+import { motion, AnimatePresence } from 'motion-v';
 import { AlertTriangle } from 'lucide-vue-next';
 import AppButton from './AppButton.vue';
 
@@ -31,19 +31,19 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 
 <template>
   <Teleport to="body">
-    <Motion
+    <AnimatePresence>
+    <motion.div
       v-if="open"
       :initial="{ opacity: 0 }"
       :animate="{ opacity: 1 }"
-      :exit="{ opacity: 0 }"
+      :exit="{ opacity: 0, transition: { duration: 0.16, ease: [0.55, 0, 1, 0.45] } }"
       class="fixed inset-0 z-50 flex items-center justify-center p-4"
     >
       <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="emit('cancel')" />
-      <Motion
+      <motion.div
         :initial="{ opacity: 0, scale: 0.95, y: 10 }"
-        :animate="{ opacity: 1, scale: 1, y: 0 }"
-        :exit="{ opacity: 0, scale: 0.95, y: 10 }"
-        :transition="{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }"
+        :animate="{ opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 420, damping: 30, mass: 0.9 } }"
+        :exit="{ opacity: 0, scale: 0.96, y: 8, transition: { duration: 0.16, ease: [0.55, 0, 1, 0.45] } }"
         class="relative w-full max-w-md rounded-lg border p-6"
         :style="{ background: 'var(--surface-primary)', borderColor: 'var(--border-default)', boxShadow: 'var(--shadow-xl)' }"
       >
@@ -58,7 +58,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
           <AppButton variant="secondary" @click="emit('cancel')">Cancel</AppButton>
           <AppButton :variant="danger ? 'danger' : 'primary'" @click="emit('confirm')">{{ confirmLabel }}</AppButton>
         </div>
-      </Motion>
-    </Motion>
+      </motion.div>
+    </motion.div>
+    </AnimatePresence>
   </Teleport>
 </template>

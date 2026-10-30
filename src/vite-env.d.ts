@@ -1,7 +1,6 @@
 /// <reference types="vite/client" />
 
-declare module '*.vue' {
-  import type { DefineComponent } from 'vue';
-  const component: DefineComponent<Record<string, unknown>, Record<string, unknown>, unknown>;
-  export default component;
-}
+// NOTE: A blanket `declare module '*.vue'` shim would shadow the real SFC
+// types that vue-tsc generates (breaking barrel re-exports with TS2305).
+// vue-tsc resolves .vue files natively via @vue/language-core, so no shim is
+// needed here. Vite handles .vue imports at runtime through @vitejs/plugin-vue.

@@ -6,29 +6,11 @@
 
 import type { VariantType } from 'motion-v'
 import { durations, easings } from './tokens'
-import type { PageId } from '@/types'
 
+/** Direction of a navigation: -1 = back (toward an earlier stack entry),
+ *  0 = neutral, +1 = forward (deeper into the app). Owned by useNavStack's
+ *  explicit LIFO policy — NOT by sidebar ordering. */
 export type MotionDirection = -1 | 0 | 1
-
-/** Navigation order used to infer directionality of a route change. */
-const PAGE_ORDER: Record<PageId, number> = {
-  overview: 0,
-  passwords: 1,
-  'api-keys': 2,
-  security: 3,
-  settings: 4,
-}
-
-export function pageDepth(page: PageId): number {
-  return PAGE_ORDER[page] ?? 0
-}
-
-export function directionBetween(from: PageId, to: PageId): MotionDirection {
-  const d = pageDepth(to) - pageDepth(from)
-  if (d > 0) return 1
-  if (d < 0) return -1
-  return 0
-}
 
 export interface PageTransitionSpec {
   initial: VariantType

@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { motion } from 'motion-v';
 import { Loader2 } from 'lucide-vue-next';
+import { buttonInteraction } from '@/motion/presets';
+import { useAppReducedMotion } from '@/motion/composables/useReducedMotion';
 
 interface Props {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
@@ -8,6 +11,8 @@ interface Props {
   loading?: boolean;
   disabled?: boolean;
 }
+
+const { reduced } = useAppReducedMotion();
 
 const props = withDefaults(defineProps<Props>(), {
   variant: 'secondary',
@@ -59,12 +64,13 @@ const styles = computed(() => {
 </script>
 
 <template>
-  <button
+  <motion.button
     :class="styles.class"
     :style="styles.style"
     :disabled="disabled || loading"
+    v-bind="reduced || disabled || loading ? {} : buttonInteraction"
   >
     <Loader2 v-if="loading" :size="12" class="animate-spin" />
     <slot />
-  </button>
+  </motion.button>
 </template>

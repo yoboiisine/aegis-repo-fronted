@@ -51,3 +51,25 @@ export const atmosphereEnter = (layer: number) => ({
     },
   },
 }) as const
+
+/** Restrained breathing pulse for the security emblem (idle only — never a
+ *  perpetual attention loop; amplitude is deliberately tiny). Paired with a
+ *  reduced-motion static alternative in UnlockView. */
+export const emblemPulse = {
+  animate: {
+    scale: [1, 1.03, 1],
+    opacity: [1, 0.92, 1],
+    transition: { duration: 4.5, ease: easings.inOut, repeat: Infinity },
+  },
+} as const
+
+/** Verification-in-progress indicator: one confident sweep, not a spinner
+ *  theatre. Driven by state, so it never fabricates success. */
+export const verifySweep = {
+  initial: { scaleX: 0, opacity: 0 },
+  animate: {
+    scaleX: 1,
+    opacity: 1,
+    transition: { duration: durations.cinematic, ease: easings.out },
+  },
+} as const
