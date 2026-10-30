@@ -4,6 +4,7 @@
  * deeper into the app pushes content forward, going back pulls it rearward.
  */
 
+import type { VariantType } from 'motion-v'
 import { durations, easings } from './tokens'
 import type { PageId } from '@/types'
 
@@ -30,9 +31,9 @@ export function directionBetween(from: PageId, to: PageId): MotionDirection {
 }
 
 export interface PageTransitionSpec {
-  initial: Record<string, unknown>
-  animate: Record<string, unknown>
-  exit: Record<string, unknown>
+  initial: VariantType
+  animate: VariantType
+  exit: VariantType
 }
 
 /**

@@ -8,10 +8,14 @@
  * prefers-reduced-motion.
  */
 import { computed } from 'vue'
-import { Motion } from 'motion-v'
 import { durations, easings } from '../tokens'
 import { useAppReducedMotion } from '../composables/useReducedMotion'
 
+
+// motion-v's `Motion` is a generic functional component whose type only
+// accepts literal tags at call sites; this alias preserves full typing while
+// letting us forward a dynamic `as` prop from our own components.
+const MotionEl = Motion as unknown as typeof Motion
 interface Props {
   /** Travel distance in px for the vertical entrance. */
   distance?: number
@@ -59,7 +63,7 @@ const exitState = computed(() =>
 </script>
 
 <template>
-  <Motion
+  <MotionEl
     :as="props.as"
     :initial="hidden"
     :while-in-view="shown"

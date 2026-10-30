@@ -17,7 +17,7 @@ interface Props {
   as?: string
 }
 
-withDefaults(defineProps<Props>(), { as: 'div' })
+const props = withDefaults(defineProps<Props>(), { as: 'div' })
 </script>
 
 <template>

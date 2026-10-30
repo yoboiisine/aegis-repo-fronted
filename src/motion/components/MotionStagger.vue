@@ -8,10 +8,14 @@
  * depending on the `when` prop. Reduced motion collapses to a fade.
  */
 import { computed } from 'vue'
-import { Motion } from 'motion-v'
 import { durations, easings, staggers } from '../tokens'
 import { useAppReducedMotion } from '../composables/useReducedMotion'
 
+
+// motion-v's `Motion` is a generic functional component whose type only
+// accepts literal tags at call sites; this alias preserves full typing while
+// letting us forward a dynamic `as` prop from our own components.
+const MotionEl = Motion as unknown as typeof Motion
 interface Props {
   /** Stagger interval override (seconds). Defaults to section cadence. */
   interval?: number
@@ -51,7 +55,7 @@ const inViewTarget = computed(() =>
 </script>
 
 <template>
-  <Motion
+  <MotionEl
     :as="props.as"
     :variants="parentVariants"
     :initial="'hidden'"

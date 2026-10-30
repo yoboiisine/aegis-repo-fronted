@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import type { Component } from 'vue';
 import { Motion } from 'motion-v';
 import { Shield, LayoutGrid, Key, Fingerprint, Settings, Lock, Sun, Moon } from 'lucide-vue-next';
 import { useVaultStore } from '@/stores/vaultStore';
@@ -9,7 +10,15 @@ import type { PageId } from '@/types';
 const store = useVaultStore();
 const { theme, toggleTheme } = useTheme();
 
-const navItems: { id: PageId; label: string; icon: any; section?: string }[] = [
+interface NavItem {
+  id: PageId;
+  label: string;
+  icon: Component;
+  /** Section heading this item belongs to. */
+  section: string;
+}
+
+const navItems: NavItem[] = [
   { id: 'overview', label: 'Overview', icon: LayoutGrid, section: 'Vault' },
   { id: 'passwords', label: 'Passwords', icon: Key, section: 'Vault' },
   { id: 'api-keys', label: 'API Keys', icon: Fingerprint, section: 'Vault' },
@@ -17,18 +26,16 @@ const navItems: { id: PageId; label: string; icon: any; section?: string }[] = [
   { id: 'settings', label: 'Settings', icon: Settings, section: 'System' },
 ];
 
-const groupedNav = computed(() => {
-  const groups: { section: string; items: typeof navItems }[] = [];
-  let currentSection = '';
-  let currentGroup: { section: string; items: typeof navItems } | null = null;
+const groupedNav = computed<{ section: string; items: NavItem[] }[]>(() => {
+  const groups: { section: string; items: NavItem[] }[] = [];
+  let currentGroup: { section: string; items: NavItem[] } | null = null;
   
   for (const item of navItems) {
-    if (item.section !== currentSection) {
-      currentSection = item.section;
+    if (!currentGroup || item.section !== currentGroup.section) {
       currentGroup = { section: item.section, items: [] };
       groups.push(currentGroup);
     }
-    currentGroup!.items.push(item);
+    currentGroup.items.push(item);
   }
   
   return groups;
