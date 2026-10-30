@@ -1,0 +1,28 @@
+/* Aegis — locally bundled fonts (OFL: Sora, Inter, JetBrains Mono).
+   No runtime dependency on external font services. Files are latin-subset
+   variable WOFF2s served by Google Fonts for static weight requests, so a
+   single file covers the declared weight range. */
+
+@font-face {
+  font-family: 'Sora';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('./assets/fonts/sora-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('./assets/fonts/inter-300_700.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: swap;
+  src: url('./assets/fonts/jetbrains-mono-400.woff2') format('woff2');
+}
