@@ -163,14 +163,20 @@ function replayStagger() {
           <AppTooltip><template #trigger><AppIconButton :icon="Trash2" label="Delete" tone="danger" /></template>Delete credential</AppTooltip>
           <AppTooltip><template #trigger><AppIconButton :icon="Settings2" label="Settings" /></template>Options</AppTooltip>
           <DropdownShell align="start" width="11rem">
-            <template #trigger="{ open: menuOpen, toggle: toggleMenu, menuId: id }">
-              <AppButton
-                variant="ghost"
-                :aria-haspopup="'menu'"
-                :aria-expanded="menuOpen"
+            <template #trigger="{ open: menuOpen, toggle: toggleMenu, menuId: id, setTriggerRef }">
+              <!-- Demonstrates the full custom-trigger contract: ARIA state on
+                   the real focusable control AND registration via setTriggerRef
+                   so DropdownShell can return focus here when the menu closes. -->
+              <button
+                :ref="setTriggerRef"
+                type="button"
+                class="inline-flex items-center gap-1.5 rounded-[var(--radius-md)] px-3 py-1.5 text-[12.5px] font-medium transition-colors hover:bg-[var(--surface-tertiary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+                :style="{ color: 'var(--text-secondary)' }"
+                aria-haspopup="menu"
+                :aria-expanded="menuOpen ? 'true' : 'false'"
                 :aria-controls="menuOpen ? id : undefined"
                 @click="toggleMenu"
-              ><MoreHorizontal :size="14" /> Menu</AppButton>
+              ><MoreHorizontal :size="14" /> Menu</button>
             </template>
             <div role="menuitem" tabindex="0" class="px-2.5 py-1.5 rounded-md text-[12px] cursor-pointer hover:bg-[var(--surface-tertiary)]" :style="{ color: 'var(--text-secondary)' }">Reveal secret</div>
             <div role="menuitem" tabindex="0" class="px-2.5 py-1.5 rounded-md text-[12px] cursor-pointer hover:bg-[var(--surface-tertiary)]" :style="{ color: 'var(--text-secondary)' }">Copy identifier</div>
