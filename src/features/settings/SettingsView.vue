@@ -48,7 +48,7 @@ const { theme, toggleTheme } = useTheme();
               <p class="text-[11px] text-[var(--text-disabled)] mt-0.5">Switch between light and dark mode</p>
             </div>
             <motion.button
-              @click="toggleTheme"
+              @click="toggleTheme({ animate: true })"
               v-bind="buttonInteraction"
               class="flex items-center gap-2 px-3 py-2 text-[12px] font-medium rounded-md border cursor-pointer"
               :style="{ background: 'var(--surface-secondary)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }"

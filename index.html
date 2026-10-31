@@ -4,9 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Aegis — Secure Credential Vault</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <!-- Fonts are bundled locally (src/assets/fonts, OFL). No external font services. -->
     <script>
       // Prevent theme flicker: apply theme before first paint
       (function() {
@@ -22,8 +20,10 @@
     <style>
       html, body { margin: 0; padding: 0; width: 100%; height: 100%; }
       #app { height: 100%; }
-      [data-theme="dark"] { background: #0a0b0f; }
-      [data-theme="light"] { background: #f8f9fb; }
+      /* Pre-paint backgrounds matching the tokenized --surface-base per theme,
+         so the first frame is already on-identity (no white/black flash). */
+      [data-theme="dark"] { background: #050a18; }
+      [data-theme="light"] { background: #eef4fc; }
     </style>
   </head>
   <body>
