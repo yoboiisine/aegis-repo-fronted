@@ -70,11 +70,29 @@ function select(id: string) {
   emit('update:modelValue', id)
 }
 
+/**
+ * Move DOM focus to a tab button (roving tabindex: only the selected tab is
+ * tabbable, so arrow navigation must follow selection or focus gets stranded
+ * on a tabindex="-1" tab). Selection is v-model-driven and may only reach the
+ * DOM after the parent re-renders, hence the nextTick.
+ */
+function focusTab(id: string) {
+  void nextTick(() => {
+    listRef.value?.querySelector<HTMLElement>(`[data-tab="${id}"]`)?.focus()
+  })
+}
+
 function onKeydown(e: KeyboardEvent) {
   const ids = props.tabs.map((t) => t.id)
+  if (ids.length === 0) return
   const i = ids.indexOf(activeId.value)
-  if (e.key === 'ArrowRight') select(ids[(i + 1) % ids.length] ?? ids[0]!)
-  else if (e.key === 'ArrowLeft') select(ids[(i - 1 + ids.length) % ids.length] ?? ids[0]!)
+  let next: string | undefined
+  if (e.key === 'ArrowRight') next = ids[(i + 1) % ids.length]
+  else if (e.key === 'ArrowLeft') next = ids[(i - 1 + ids.length) % ids.length]
+  if (!next) return
+  e.preventDefault() // keep arrow keys from scrolling the viewport
+  select(next)
+  focusTab(next)
 }
 </script>
 
