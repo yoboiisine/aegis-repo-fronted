@@ -1,10 +1,9 @@
 <script setup lang="ts">
 /**
- * AppPasswordInput — masked-input VISUAL PRIMITIVE only.
+ * AppPasswordInput — masked-input VISUAL PRIMITIVE.
  *
  * The eye toggle is local display state (type=password ⇄ text); it performs
- * no encryption, reveal-from-vault, or copy behavior. Real secret handling
- * belongs to Phase 2+ application screens.
+ * no encryption, reveal-from-vault, or copy behavior.
  */
 import { computed, ref } from 'vue'
 import { Eye, EyeOff } from 'lucide-vue-next'
@@ -26,6 +25,8 @@ interface Props {
   disabled?: boolean
   error?: string
   id?: string
+  autocomplete?: string
+  autofocus?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -33,6 +34,8 @@ const props = withDefaults(defineProps<Props>(), {
   size: 'md',
   disabled: false,
   error: undefined,
+  autocomplete: 'off',
+  autofocus: false,
 })
 
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
@@ -41,6 +44,12 @@ const fallbackId = `pw-${Math.random().toString(36).slice(2, 9)}`
 const inputId = computed(() => props.id ?? fallbackId)
 const focused = ref(false)
 const revealed = ref(false)
+const inputEl = ref<HTMLInputElement | null>(null)
+
+defineExpose({
+  focus: () => inputEl.value?.focus(),
+  blur: () => inputEl.value?.blur(),
+})
 
 const classes = computed(
   () => `${controlBaseClass} ${controlSizeClasses[props.size]} pr-10`,
@@ -59,21 +68,24 @@ const style = computed(() => ({
     <div class="relative">
       <input
         :id="inputId"
+        ref="inputEl"
         :class="classes"
         :style="style"
         :type="revealed ? 'text' : 'password'"
         :value="modelValue"
         :placeholder="placeholder"
         :disabled="disabled"
+        :autofocus="autofocus"
+        :autocomplete="autocomplete"
         :aria-invalid="error ? true : undefined"
-        autocomplete="off"
+        :aria-describedby="error ? `${inputId}-error` : undefined"
         @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
         @focus="focused = true"
         @blur="focused = false"
       />
       <button
         type="button"
-        class="absolute inset-y-0 right-0 flex items-center pr-2.5 pl-1 rounded-r-md outline-none"
+        class="absolute inset-y-0 right-0 flex items-center pr-2.5 pl-1 rounded-r-md outline-none cursor-pointer"
         :style="{ color: revealed ? 'var(--accent-primary)' : 'var(--text-tertiary)' }"
         :aria-label="revealed ? 'Hide value' : 'Show value'"
         :aria-pressed="revealed"
@@ -83,7 +95,7 @@ const style = computed(() => ({
         <component :is="revealed ? EyeOff : Eye" :size="15" />
       </button>
     </div>
-    <p v-if="error" class="mt-1 text-[11px]" :style="{ color: 'var(--danger)' }">{{ error }}</p>
+    <p v-if="error" :id="`${inputId}-error`" class="mt-1 text-[11px]" :style="{ color: 'var(--danger)' }">{{ error }}</p>
   </div>
 </template>
 

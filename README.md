@@ -1,59 +1,71 @@
-# Aegis Frontend — Cinematic Glassmorphism Design System
+# Aegis Frontend — Cinematic Glassmorphism Design System & Vault Lifecycle
 
-Premium, local-first password & API-key vault frontend. This repository currently
-contains **Phase 0 (reconnaissance/planning)** and **Phase 1 (visual foundation +
-design system)** deliverables: a complete token architecture, light/dark themes,
-glass-surface primitives, foundational UI components, a centralized motion system,
-animated theme switching, and a design-system showcase. No application features
-(auth, vault CRUD, backend integration) are implemented yet — by design.
+Premium, local-first password & API-key vault frontend. This repository contains:
+- **Phase 0:** Repository reconnaissance, technical assessment, and architectural planning.
+- **Phase 1:** Cinematic Glassmorphism design system, token architecture (Glacier light / Midnight dark), glass primitives, UI primitives, and motion foundation.
+- **Phase 2:** Application shell, navigation structure, and page transitions.
+- **Phase 3:** Complete vault lifecycle and authentication experience: first-run setup, recovery-key presentation and confirmation, passphrase unlocking, emergency recovery entry, manual locking with synchronous memory zeroing, and locked/unlocked transitions.
 
-See `docs/PHASE0_RECONNAISSANCE.md` for the full technical assessment.
+## Phase 3: Vault Lifecycle & Authentication
+
+Phase 3 delivers the complete vault lifecycle experience:
+
+1. **First-Run Vault Setup (`VaultSetupCard.vue`):**
+   - Distinguishes an uninitialized vault (`state: 'uninitialized'`) from a locked vault (`state: 'locked'`) using real vault status from the service boundary.
+   - Master passphrase creation and confirmation with real-time requirement validation (minimum 12 characters, confirmation mismatch checking).
+   - Form loading, double-submission prevention, and accessible error handling.
+
+2. **Recovery-Key Presentation & Confirmation (`VaultRecoverySetupCard.vue`):**
+   - Displayed **only when supplied by the backend** in the `createVault` response (`recoveryKey`).
+   - Deliberate privacy experience: masked by default with an explicit reveal/mask toggle.
+   - Copy-to-clipboard action with tactile feedback (`confirmPop` motion preset).
+   - Prominent security advisory requiring offline storage.
+   - Explicit confirmation requirement ("I have written down or safely backed up this recovery key offline") before setup completion.
+   - Strict memory hygiene: the key is never stored in `localStorage`, `sessionStorage`, or URL parameters, and is cleared from in-memory state upon completion or exit.
+   - Never fabricates a recovery key if the backend does not return one.
+
+3. **Vault Unlocking (`VaultUnlockCard.vue`):**
+   - Replaced prototype with production-quality glassmorphism implementation using `GlassPanel` and `AppPasswordInput`.
+   - Master passphrase entry with visibility toggle, double-submission locking, loading state ("Deriving key..."), and accessible error alerts (`role="alert"`, `aria-live="polite"`).
+   - Immediate in-memory clearing of the passphrase upon successful unlock.
+   - Application shell mounts only upon confirmed backend/client unlock success.
+
+4. **Emergency Recovery Entry (`VaultRecoveryCard.vue`):**
+   - Dedicated monospace recovery key entry with uppercase formatting and input validation.
+   - Explicit integration boundary on `VaultClient` (`recoverVault?(recoveryKey: string): Promise<RecoverVaultResult>`).
+   - Graceful error states when keys are malformed or when the active backend does not support recovery.
+   - Clean cancellation returning to standard master passphrase entry.
+
+5. **Manual Vault Locking (`store.lock()`):**
+   - Synchronous, immediate security wipe: all in-memory credentials, passwords, API keys, selected items, activity, and presented keys are zeroed out before network or animation delays.
+   - Smooth presentation-only transition back to the locked vault view.
+
+6. **Development Mock Testing Adapter (`mockVaultClient.ts`):**
+   - Clearly identified development mock integration boundary.
+   - Starts in `uninitialized` state to immediately demonstrate first-run setup.
+   - Discreet mock switcher pill in the footer allows developers and reviewers to toggle between `1. First-Run Setup` and `2. Unlock & Recovery` for testing without restarting the application.
 
 ## Visual Identity — Cinematic Glassmorphism
 
-Aegis feels like an atmospheric, purpose-built security instrument: layered
-translucent glass over a soft aurora backdrop, restrained golden lighting, and
-deep blue-tinted ink. Blur, gradient, glow and shadow are applied through a
-centralized recipe system (`a-glass--*`, tokens in `src/styles/tokens.css`) —
-never ad hoc per component.
+Aegis feels like an atmospheric, purpose-built security instrument: layered translucent glass over a soft aurora backdrop, restrained golden lighting, and deep blue-tinted ink. Blur, gradient, glow, and shadow are applied through a centralized recipe system (`a-glass--*`, tokens in `src/styles/tokens.css`) — never ad hoc per component.
 
 ### Themes
 
-Applied via `<html data-theme="light|dark">`; all colors resolve through semantic
-tokens so components never hardcode palette values.
+Applied via `<html data-theme="light|dark">`; all colors resolve through semantic tokens so components never hardcode palette values.
 
-**Light — "Glacier":** soft white/pale-blue backgrounds (`#eef4fc` base), layered
-blue-white surfaces, deep muted-blue ink (`--a-blue-ink-900 #16305e`), darker-blue
-accents (`--a-blue-500/400`), restrained gold hairlines (`--a-gold-600 #b98f3e`),
-delicate shadows, translucent light glass.
+- **Light — "Glacier":** soft white/pale-blue backgrounds (`#eef4fc` base), layered blue-white surfaces, deep muted-blue ink (`--a-blue-ink-900 #16305e`), darker-blue accents (`--a-blue-500/400`), restrained gold hairlines (`--a-gold-600 #b98f3e`), delicate shadows, translucent light glass.
+- **Dark — "Midnight":** deep navy backgrounds (`#050a18` base), midnight-blue surface tiers, blue-tinted glass (`--glass-bg rgba(18,34,74,.55)` etc.), cool-blue accent lighting (`--a-blue-400 #6aa5ff`), controlled gold highlights (`--a-gold-500 #d9b36a`, `--gold-border`, `--shadow-gold`), high-contrast text.
 
-**Dark — "Midnight":** deep navy backgrounds (`#050a18` base), midnight-blue
-surface tiers, blue-tinted glass (`--glass-bg rgba(18,34,74,.55)` etc.), cool-blue
-accent lighting (`--a-blue-400 #6aa5ff`), controlled gold highlights
-(`--a-gold-500 #d9b36a`, `--gold-border`, `--shadow-gold`), high-contrast text.
-Not an inversion of light mode — its own designed identity.
-
-Key semantic tokens (both themes define these; see `src/styles/tokens.css`):
-`--surface-base/primary/secondary/tertiary`, `--glass-bg[-subtle/-elevated/-modal]`,
-`--glass-border`, `--text-primary/secondary/tertiary/on-accent`, `--accent-*`,
-`--gold*`, `--border-*`, `--shadow-*`, `--gradient-accent`,
-`--gradient-gold-hairline`, `--blur-xs…xl`, `--radius-*`, `--focus-ring`.
-
-### Theme switching
+### Theme Switching
 
 `src/composables/useTheme.ts` is the single source of truth:
-- Pre-paint bootstrap inline script in `index.html` sets `data-theme` before first
-  frame (no wrong-theme flash); persists to localStorage; follows system preference.
-- `toggleTheme({ animate: true })` uses the **View Transitions API** (crossfade,
-  no layout shift) when available, with a `.theme-animating` CSS-interpolation
-  fallback elsewhere. Reduced-motion collapses both paths instantly.
-- `ThemeToggle.vue` provides the reusable animated switch (spring knob, icon
-  crossfade).
+- Pre-paint bootstrap inline script in `index.html` sets `data-theme` before first frame (no wrong-theme flash); persists to localStorage; follows system preference.
+- `toggleTheme({ animate: true })` uses the **View Transitions API** (crossfade, no layout shift) when available, with a `.theme-animating` CSS-interpolation fallback elsewhere. Reduced-motion collapses both paths instantly.
+- `ThemeToggle.vue` provides the reusable animated switch (spring knob, icon crossfade).
 
 ## Typography
 
-Locally bundled variable fonts (WOFF2 in `src/assets/fonts/`, `@font-face` in
-`src/styles/fonts.css`) — **zero runtime dependency on external font services**:
+Locally bundled variable fonts (WOFF2 in `src/assets/fonts/`, `@font-face` in `src/styles/fonts.css`) — zero runtime dependency on external font services:
 
 | Register | Class | Font |
 |---|---|---|
@@ -63,88 +75,53 @@ Locally bundled variable fonts (WOFF2 in `src/assets/fonts/`, `@font-face` in
 | Labels / metadata | `.a-label`, `.a-meta` | Inter |
 | Technical identifiers | `.a-mono` | JetBrains Mono |
 
-Sizes/weights come from the `--text-*` type scale in `tokens.css`; components use
-the classes above rather than arbitrary `text-[Npx]`.
-
 ## Glass Surfaces
 
-One shared recipe (`.a-glass` + depth modifier) guarantees consistent background
-opacity, backdrop blur, border, inner highlight, shadow and radius:
+One shared recipe (`.a-glass` + depth modifier) guarantees consistent background opacity, backdrop blur, border, inner highlight, shadow, and radius:
 
-`a-glass--subtle` · `a-glass--standard` · `a-glass--elevated` · `a-glass--modal` ·
-`a-glass--focused` · `a-glass--gold` (premium hairline variant).
-The ambient backdrop is `.a-aurora` (three slow-drifting blobs; static under
-reduced motion). Blur tiers are capped (`--blur-xs 6px … --blur-xl 40px`) to keep
-rendering cheap and text readable.
+`a-glass--subtle` · `a-glass--standard` · `a-glass--elevated` · `a-glass--modal` · `a-glass--focused` · `a-glass--gold` (premium hairline variant).
+
+The ambient backdrop is `.a-aurora` (three slow-drifting blobs; static under reduced motion). Blur tiers are capped (`--blur-xs 6px … --blur-xl 40px`) to keep rendering performant and text readable.
 
 ## Component Foundation (`src/components/ui/`, barrel: `@/components/ui`)
 
-Unopinionated visual primitives only — no vault/business logic:
-
-- `AppButton` (variants: primary/secondary/danger/ghost/glass/gold; sizes sm/md/lg;
-  loading/disabled; explicit `type="button"`) and `AppIconButton`
-- `AppInput`, `AppPasswordInput` (visual primitives), `FieldGroup`
-- `AppBadge` (tones incl. gold/success/warning/danger; `solid` fill option),
-  `AppDivider`, `AppSpinner`, `EmptyState`, `KeyValue`
+Unopinionated visual primitives:
+- `AppButton` (variants: primary/secondary/danger/ghost/glass/gold; sizes sm/md/lg; loading/disabled; configurable `type="button" | "submit"`) and `AppIconButton`
+- `AppInput`, `AppPasswordInput` (masked text control with reveal toggle, autofocus, autocomplete, and focus forwarding), `FieldGroup`
+- `AppBadge` (tones incl. gold/success/warning/danger; `solid` fill option), `AppDivider`, `AppSpinner`, `EmptyState`, `KeyValue`
 - `GlassPanel`, `Card` — glass-depth containers
-- `ModalShell` (focus trap, Escape, scroll lock, focus restore, immediate-open),
-  `DropdownShell` (WAI-ARIA menu pattern — see below), `AppTabs` (measured sliding
-  pill, ResizeObserver-correct), `AppTooltip`, `AppDialog`, `AppToasts`
+- `ModalShell`, `DropdownShell`, `AppTabs`, `AppTooltip`, `AppDialog`, `AppToasts`
 - `ThemeToggle`
-
-**DropdownShell trigger contract:** by default it renders a real focusable
-`<button>` carrying `aria-haspopup="menu"`, `aria-expanded` and `aria-controls`.
-With a custom `#trigger` slot, the shell exposes `{ open, toggle, menuId,
-setTriggerRef }` slot props so your actual control binds the ARIA attributes
-(`setTriggerRef` registers it for Escape/focus-return). The old dead-wrapper
-attributes are gone. Example usage lives in the showcase.
-
-Icons: `lucide-vue-next` only, passed as components with a consistent size
-convention (11–16px inline, via `:size`).
 
 ## Motion System (`src/motion/`)
 
 Centralized on `motion-v` with tokens in `tokens.ts`:
-- `durations`: micro 0.15s · control 0.22s · component 0.3s · panel 0.38s (+ page)
-- `easings`: out `[0.16,1,0.3,1]` · inOut · in
+- `durations`: micro 0.15s · control 0.22s · component 0.3s · panel 0.38s · page 0.5s · cinematic 0.8s
+- `easings`: out `[0.16, 1, 0.3, 1]` · inOut · in
 - `springs`: snappy · smooth · dialog
-- `presets.ts` interaction bundles: `buttonInteraction`, `cardInteraction`,
-  `navItemInteraction`, `confirmPop`, `atmosphereEnter`, `emblemPulse`,
-  `themeSurfaceTransition`, `verifySweep` — plus existing page/stagger transitions.
-
-Components consume presets (`v-bind="buttonInteraction"` etc.) instead of
-hand-rolling animation objects. Only GPU-friendly transform/opacity animate; no
-decorative loops beyond the capped aurora drift.
-
-**Reduced motion:** `useAppReducedMotion()` (JS side) drops interaction bundles
-and switches state animations to instant; `global.css` neutralizes CSS
-transitions/animations, aurora drift and view-transition duration under
-`prefers-reduced-motion`. Functional rotation (spinner) is intentionally kept.
+- `presets.ts` interaction bundles: `buttonInteraction`, `cardInteraction`, `navItemInteraction`, `confirmPop`, `atmosphereEnter`, `emblemPulse`, `themeSurfaceTransition`, `verifySweep`.
+- `useAppReducedMotion()` ensures full accessibility under `prefers-reduced-motion`.
 
 ## Design-System Preview
 
-Open **`/#/design-system`** (dev or built site). It mounts
-`src/design-system/DesignSystemPreview.vue` instead of the vault shell and
-demonstrates both themes, typography hierarchy, palette, glass depths, borders/
-shadows, every UI primitive with hover/focus/disabled states, modal/dropdown/tabs
-presentation, motion examples, and the animated theme transition. It is a review
-surface, not app navigation (`isDesignSystemRoute()` in `src/types/index.ts`).
+Open **`/#/design-system`** (dev or built site). Mounts `src/design-system/DesignSystemPreview.vue` to inspect themes, typography, glass depths, UI primitives, and motion examples.
 
-## Development
+## Development & Verification
 
 ```bash
-npm install
-npm run dev        # http://localhost:3000  (showcase: /#/design-system)
-npm run build      # production build (Vite)
-npm run typecheck  # vue-tsc strict validation
+pnpm install
+pnpm run dev        # http://localhost:3000 (showcase: /#/design-system)
+pnpm run build      # production build (Vite)
+pnpm run typecheck  # vue-tsc strict validation
+pnpm run test       # automated lifecycle test suite (12 tests)
 ```
-
-Stack: Vue 3.5 · Vite 6 · TypeScript (strict) · Tailwind CSS v4 · motion-v ·
-Pinia · lucide-vue-next. Fonts and all assets bundled locally.
 
 ## Status & Boundaries
 
-Phase 1 complete: tokens, both themes, glass primitives, UI foundation, motion
-system, theme infrastructure, showcase. Phase 2 (application screens) must build
-on these primitives. Backend contracts (`src/services/api/contracts.ts`) remain
-untouched; mock client stays clearly development-only.
+- **Phase 0:** Complete.
+- **Phase 1:** Complete (tokens, themes, glass primitives, UI foundation, motion system).
+- **Phase 2:** Complete (application shell, navigation, page transitions).
+- **Phase 3:** Complete (vault lifecycle, setup, recovery key handling, unlock, recovery, locking).
+- **Remaining Limitations:**
+  - Credential CRUD and dashboard feature expansions remain for future phases.
+  - Backend integration uses the explicitly defined development mock integration boundary (`mockVaultClient.ts`); real backend HTTP endpoints will be connected when the Aegis backend service is deployed.
