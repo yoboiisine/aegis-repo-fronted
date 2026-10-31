@@ -78,7 +78,17 @@ const MENU_ITEM_SELECTOR = ['[role="menuitem"]', '[role="menuitemradio"]', '[rol
   .map((s) => `${s}:not([disabled])`)
   .join(', ')
 
-function setOpen(value: boolean) {
+/**
+ * Why the menu is closing. Only `'escape'` restores focus to the trigger:
+ *   - Outside pointer dismissal must NOT steal focus from the element the
+ *     user just clicked into.
+ *   - Tab dismissal must NOT yank focus backwards, or keyboard navigation
+ *     through the page breaks.
+ *   - Item activation delegates focus naturally to whatever the item does.
+ */
+type DismissReason = 'escape' | 'outside-pointer' | 'tab' | 'item-activation' | 'toggle'
+
+function setOpen(value: boolean, reason: DismissReason = 'toggle') {
   if (open.value === value) return
   internalOpen.value = value // keeps uncontrolled mode consistent
   emit('update:modelValue', value)
@@ -87,17 +97,15 @@ function setOpen(value: boolean) {
     void nextTick(() => {
       panelRef.value?.querySelector<HTMLElement>(MENU_ITEM_SELECTOR)?.focus()
     })
-  } else {
-    // Return focus to the trigger control on keyboard/click dismissal so
-    // users are not dumped back to the top of the document. Prefer the
-    // registered trigger; fall back to the first focusable descendant of
-    // the root (custom-slot consumers that skip setTriggerRef).
+  } else if (reason === 'escape') {
+    // Return focus to the trigger control so users are not dumped back to
+    // the top of the document. Prefer the registered trigger.
     currentTrigger()?.focus()
   }
 }
 
 function toggle() {
-  setOpen(!open.value)
+  setOpen(!open.value, 'toggle')
 }
 
 /** Slot props exposed to #trigger so the real control can carry ARIA state. */
@@ -114,8 +122,11 @@ const triggerSlotProps = {
       customTriggerRef.value = null
       return
     }
-    const inst = 'elementFromPoint' in el && !(el instanceof HTMLElement) ? (el as ComponentPublicInstance).$el : el
-    customTriggerRef.value = inst instanceof HTMLElement ? inst : null
+    // Plain element refs are Elements already; component refs expose their
+    // root node via `$el`. An explicit instanceof check is the only reliable
+    // discriminator — do NOT probe for DOM APIs on the ref.
+    const node = el instanceof HTMLElement ? el : (el as ComponentPublicInstance).$el
+    customTriggerRef.value = node instanceof HTMLElement ? node : null
   },
 }
 
@@ -123,14 +134,14 @@ function onDocPointer(e: PointerEvent) {
   const target = e.target as Element | null
   if (!rootRef.value || !target) return
   if (!rootRef.value.contains(target)) {
-    if (open.value) setOpen(false)
+    if (open.value) setOpen(false, 'outside-pointer')
     return
   }
   // Click landed on a menu item inside an open panel: close after the item's
   // own click handler runs (pointerdown precedes click), unless the row opts
   // out via data-dropdown-keep-open (e.g. checkbox rows).
   if (open.value && target.closest(MENU_ITEM_SELECTOR) && !target.closest('[data-dropdown-keep-open]')) {
-    setTimeout(() => setOpen(false), 0)
+    setTimeout(() => setOpen(false, 'item-activation'), 0)
   }
 }
 
@@ -140,7 +151,7 @@ onUnmounted(() => document.removeEventListener('pointerdown', onDocPointer))
 function onRootKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape' && open.value) {
     e.preventDefault()
-    setOpen(false)
+    setOpen(false, 'escape')
   }
 }
 
@@ -161,7 +172,9 @@ function onPanelKeydown(e: KeyboardEvent) {
     e.preventDefault()
     items[items.length - 1]?.focus()
   } else if (e.key === 'Tab') {
-    setOpen(false)
+    // Let the browser move focus naturally; closing must not re-focus the
+    // trigger and fight the tab sequence.
+    setOpen(false, 'tab')
   }
 }</script>
 
