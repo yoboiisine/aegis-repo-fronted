@@ -107,7 +107,14 @@ const triggerSlotProps = {
   menuId,
   /** Register the consumer's focusable control for Escape/focus-return. */
   setTriggerRef: (el: Element | ComponentPublicInstance | null) => {
-    const inst = (el as ComponentPublicInstance | null)?.$el ?? el
+    // Guard: plain <button> refs are Elements directly; component refs expose
+    // $el. A reactive slot prop can be undefined before first render, so
+    // tolerate null/undefined rather than throwing inside the ref hook.
+    if (!el) {
+      customTriggerRef.value = null
+      return
+    }
+    const inst = 'elementFromPoint' in el && !(el instanceof HTMLElement) ? (el as ComponentPublicInstance).$el : el
     customTriggerRef.value = inst instanceof HTMLElement ? inst : null
   },
 }

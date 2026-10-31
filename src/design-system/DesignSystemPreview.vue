@@ -167,16 +167,14 @@ function replayStagger() {
               <!-- Demonstrates the full custom-trigger contract: ARIA state on
                    the real focusable control AND registration via setTriggerRef
                    so DropdownShell can return focus here when the menu closes. -->
-              <button
+              <AppButton
                 :ref="setTriggerRef"
-                type="button"
-                class="inline-flex items-center gap-1.5 rounded-[var(--radius-md)] px-3 py-1.5 text-[12.5px] font-medium transition-colors hover:bg-[var(--surface-tertiary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
-                :style="{ color: 'var(--text-secondary)' }"
+                variant="ghost"
                 aria-haspopup="menu"
                 :aria-expanded="menuOpen ? 'true' : 'false'"
                 :aria-controls="menuOpen ? id : undefined"
                 @click="toggleMenu"
-              ><MoreHorizontal :size="14" /> Menu</button>
+              ><MoreHorizontal :size="14" /> Menu</AppButton>
             </template>
             <div role="menuitem" tabindex="0" class="px-2.5 py-1.5 rounded-md text-[12px] cursor-pointer hover:bg-[var(--surface-tertiary)]" :style="{ color: 'var(--text-secondary)' }">Reveal secret</div>
             <div role="menuitem" tabindex="0" class="px-2.5 py-1.5 rounded-md text-[12px] cursor-pointer hover:bg-[var(--surface-tertiary)]" :style="{ color: 'var(--text-secondary)' }">Copy identifier</div>
