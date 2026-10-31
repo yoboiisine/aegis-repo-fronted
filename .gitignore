@@ -1,1 +1,12 @@
+node_modules
+dist
+build/
+.next/
+*.log
+.env
+.env.*
+.DS_Store
+__pycache__
+.cache/
+coverage/
 *.bundle
