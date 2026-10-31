@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./fonts.css";
 @import "./tokens.css";
 
 /* Base Reset
@@ -25,9 +26,9 @@
   body {
     background-color: var(--surface-base);
     color: var(--text-primary);
-    line-height: 1.5;
-    transition: background-color var(--duration-slow) var(--ease-in-out),
-                color var(--duration-slow) var(--ease-in-out);
+    line-height: 1.55;
+    transition: background-color var(--duration-component) var(--ease-in-out),
+                color var(--duration-component) var(--ease-in-out);
   }
 }
 
@@ -39,40 +40,228 @@
   min-height: 100%;
 }
 
-/* Scrollbar Styling */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* ==========================================================================
+   Typography scale classes — one definition per register (token-driven).
+   Components use these instead of ad-hoc text-[Npx] values.
+   ========================================================================== */
+.a-display      { font: var(--text-display);     letter-spacing: var(--tracking-display); color: var(--text-primary); }
+.a-title        { font: var(--text-title);       letter-spacing: var(--tracking-display); color: var(--text-primary); }
+.a-heading      { font: var(--text-heading);     letter-spacing: -0.005em;                 color: var(--text-primary); }
+.a-subheading   { font: var(--text-subheading);                                            color: var(--text-primary); }
+.a-body         { font: var(--text-body);                                                  color: var(--text-secondary); }
+.a-supporting   { font: var(--text-supporting);                                              color: var(--text-secondary); }
+.a-label        { font: var(--text-label);       letter-spacing: var(--tracking-label);     color: var(--text-tertiary); text-transform: uppercase; }
+.a-meta         { font: var(--text-meta);                                                    color: var(--text-tertiary); }
+.a-mono         { font: var(--text-mono);                                                  color: var(--text-primary); }
+
+/* ==========================================================================
+   Ambient atmosphere — cinematic backdrop.
+   Fixed, pointer-events-none, GPU-cheap: two large blurred radial washes
+   behind everything. Rendered once at the app root, never per surface.
+   ========================================================================== */
+.a-aurora {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
+.a-aurora__blob {
+  position: absolute;
+  border-radius: var(--radius-full);
+  filter: blur(var(--blur-xl));
+  will-change: transform;
 }
 
+.a-aurora__blob--1 {
+  width: 46rem; height: 46rem;
+  top: -18rem; left: -12rem;
+  background: radial-gradient(circle, var(--aurora-1) 0%, transparent 70%);
+}
+
+.a-aurora__blob--2 {
+  width: 38rem; height: 38rem;
+  bottom: -14rem; right: -10rem;
+  background: radial-gradient(circle, var(--aurora-2) 0%, transparent 70%);
+}
+
+.a-aurora__blob--3 {
+  width: 24rem; height: 24rem;
+  top: 34%; right: 22%;
+  background: radial-gradient(circle, var(--aurora-3) 0%, transparent 70%);
+  opacity: 0.7;
+}
+
+/* Slow drift is intentionally subtle; disabled under reduced motion below. */
+@media (prefers-reduced-motion: no-preference) {
+  .a-aurora__blob--1 { animation: a-drift-a 46s var(--ease-in-out) infinite alternate; }
+  .a-aurora__blob--2 { animation: a-drift-b 58s var(--ease-in-out) infinite alternate; }
+}
+
+@keyframes a-drift-a {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(4rem, 3rem, 0); }
+}
+
+@keyframes a-drift-b {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-3rem, -4rem, 0); }
+}
+
+/* ==========================================================================
+   Glass primitives (CSS layer backing GlassPanel.vue)
+   Depth tiers share: background tint, blur, border, inner highlight, shadow.
+   ========================================================================== */
+.a-glass {
+  position: relative;
+  isolation: isolate;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--blur-md)) saturate(1.35);
+  -webkit-backdrop-filter: blur(var(--blur-md)) saturate(1.35);
+  box-shadow: var(--shadow-md);
+}
+
+/* Top-edge light catch. Pseudo-element keeps the panel's own background
+   clean and lets radius clipping stay simple. */
+.a-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--glass-highlight);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.a-glass--subtle {
+  background: var(--glass-bg-subtle);
+  backdrop-filter: blur(var(--blur-xs)) saturate(1.2);
+  -webkit-backdrop-filter: blur(var(--blur-xs)) saturate(1.2);
+  box-shadow: var(--shadow-xs);
+}
+
+.a-glass--standard { background: var(--glass-bg); }
+
+.a-glass--elevated {
+  background: var(--glass-bg-elevated);
+  backdrop-filter: blur(var(--blur-lg)) saturate(1.4);
+  -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(1.4);
+  border-color: var(--glass-border-strong);
+  box-shadow: var(--shadow-lg);
+}
+
+.a-glass--modal {
+  background: var(--glass-bg-modal);
+  backdrop-filter: blur(var(--blur-xl)) saturate(1.5);
+  -webkit-backdrop-filter: blur(var(--blur-xl)) saturate(1.5);
+  border-color: var(--glass-border-strong);
+  box-shadow: var(--shadow-modal);
+}
+
+.a-glass--focused {
+  border-color: var(--accent-border);
+  box-shadow: var(--shadow-lg), var(--shadow-accent);
+}
+
+/* Golden variant — reserved for premium highlights (never default chrome). */
+.a-glass--gold {
+  border-color: var(--gold-border);
+  box-shadow: var(--shadow-md), var(--shadow-gold);
+}
+
+/* Gold hairline divider/accent rule. */
+.a-gold-hairline {
+  height: 1px;
+  border: 0;
+  background: var(--gradient-gold-hairline);
+  opacity: 0.8;
+}
+
+/* ==========================================================================
+   Scrollbar / focus / selection
+   ========================================================================== */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: var(--border-default);
+  background: var(--scrollbar-thumb);
   border-radius: var(--radius-sm);
-  transition: background var(--duration-fast) var(--ease-in-out);
+  transition: background var(--duration-micro) var(--ease-in-out);
 }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--border-strong);
-}
-
-/* Focus Styles */
 :focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--focus-ring);
   border-radius: var(--radius-sm);
 }
 
-/* Selection */
 ::selection {
   background-color: var(--accent-muted);
   color: var(--text-primary);
 }
 
-/* Reduced Motion */
+/* ==========================================================================
+   Loading indicator
+   ========================================================================== */
+@keyframes a-spin { to { transform: rotate(360deg); } }
+
+.a-spinner {
+  display: inline-block;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--accent-muted);
+  border-top-color: var(--accent-primary);
+  animation: a-spin 0.9s linear infinite;
+}
+
+/* Shimmer sweep used by skeleton/loading surfaces (opacity-only, cheap). */
+@keyframes a-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.a-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-tertiary);
+  border-radius: var(--radius-md);
+}
+
+.a-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-sheen);
+  animation: a-shimmer 1.8s var(--ease-in-out) infinite;
+}
+
+/* ==========================================================================
+   View Transitions — animated theme switch (Chromium / Win11 target).
+   The NEW snapshot is painted on top and fades in while the OLD snapshot
+   stays fully visible beneath it — a true crossfade of the two themes with
+   zero flashing and zero layout shift. (We deliberately do NOT animate the
+   old snapshot out: that would reveal the bare body color underneath.)
+   ========================================================================== */
+::view-transition-old(root) {
+  animation: none;
+}
+
+::view-transition-new(root) {
+  animation: a-vt-theme-fade-in var(--duration-component) var(--ease-in-out) both;
+  mix-blend-mode: normal;
+}
+
+@keyframes a-vt-theme-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ==========================================================================
+   Reduced motion — polished static alternative.
+   Entrance states resolve instantly; ambients stop drifting; spinners keep
+   a functional (non-decorative) rotation because they communicate state.
+   ========================================================================== */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
@@ -80,74 +269,11 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-}
 
-/* Utility Classes */
-.surface-base { background-color: var(--surface-base); }
-.surface-primary { background-color: var(--surface-primary); }
-.surface-secondary { background-color: var(--surface-secondary); }
-.surface-tertiary { background-color: var(--surface-tertiary); }
-.surface-elevated { background-color: var(--surface-elevated); }
+  /* Keep essential progress feedback visible but calm. */
+  .a-spinner { animation-duration: 1.6s !important; animation-iteration-count: infinite !important; }
+  .a-skeleton::after { animation: none; }
+  .a-aurora__blob { animation: none !important; }
 
-.text-primary { color: var(--text-primary); }
-.text-secondary { color: var(--text-secondary); }
-.text-tertiary { color: var(--text-tertiary); }
-
-.border-subtle { border-color: var(--border-subtle); }
-.border-default { border-color: var(--border-default); }
-.border-strong { border-color: var(--border-strong); }
-
-/* Animations */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes scaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.animate-fadeIn {
-  animation: fadeIn var(--duration-normal) var(--ease-out);
-}
-
-.animate-slideUp {
-  animation: slideUp var(--duration-normal) var(--ease-out);
-}
-
-.animate-slideDown {
-  animation: slideDown var(--duration-normal) var(--ease-out);
-}
-
-.animate-scaleIn {
-  animation: scaleIn var(--duration-normal) var(--ease-out);
+  ::view-transition-new(root) { animation-duration: 0.01ms !important; }
 }

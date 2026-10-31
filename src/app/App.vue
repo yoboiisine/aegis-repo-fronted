@@ -11,12 +11,13 @@
  *  - Locking clears sensitive store state immediately; the visual exit is a
  *    pure presentation layer and never gates the security operation.
  */
-import { onMounted, watch } from 'vue';
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { AnimatePresence, motion } from 'motion-v';
 import { useVaultStore } from '@/stores/vaultStore';
 import { useTheme } from '@/composables/useTheme';
 import { usePageMotion } from '@/motion/composables/usePageMotion';
 import { MotionPage } from '@/motion/components';
+import { isDesignSystemRoute } from '@/types';
 
 // Features
 import UnlockView from '@/features/vault/UnlockView.vue';
@@ -30,13 +31,33 @@ import SettingsView from '@/features/settings/SettingsView.vue';
 import AppSidebar from '@/components/layout/AppSidebar.vue';
 import AppToasts from '@/components/ui/AppToasts.vue';
 
+// Design-system showcase (Phase 1 review surface — hash route only, never
+// renders vault data and is not part of the application navigation model).
+import DesignSystemPreview from '@/design-system/DesignSystemPreview.vue';
+
 const store = useVaultStore();
 const { initTheme } = useTheme();
 const { pageKey, transition } = usePageMotion();
 
+/** Reactive `#/design-system` hash route. */
+const showDesignSystem = ref(isDesignSystemRoute(window.location.hash));
+function onHashChange() {
+  showDesignSystem.value = isDesignSystemRoute(window.location.hash);
+}
+
 onMounted(async () => {
   initTheme();
-  await store.init();
+  window.addEventListener('hashchange', onHashChange);
+  // The showcase is an isolated review surface: skip vault initialization
+  // entirely while it is mounted so no client/state work happens behind it.
+  if (!showDesignSystem.value) await store.init();
+});
+
+onBeforeUnmount(() => window.removeEventListener('hashchange', onHashChange));
+
+watch(showDesignSystem, async (ds) => {
+  // Leaving the showcase: initialize vault state if it never was.
+  if (!ds && store.status.state === 'locked') await store.init();
 });
 
 watch(() => store.isUnlocked, (unlocked) => {
@@ -49,8 +70,10 @@ watch(() => store.isUnlocked, (unlocked) => {
 
 <template>
   <div class="h-full w-full overflow-hidden" :style="{ background: 'var(--surface-base)' }">
-    <!-- Locked / unlocked environments: cinematic cross-environment swap -->
-    <AnimatePresence mode="wait">
+    <!-- Design-system preview: full-screen review surface for Phase 1 -->
+    <DesignSystemPreview v-if="showDesignSystem" />
+
+    <AnimatePresence v-else mode="wait">
       <UnlockView v-if="!store.isUnlocked" key="unlock" />
 
       <motion.div
