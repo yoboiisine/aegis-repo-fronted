@@ -63,18 +63,6 @@ export const emblemPulse = {
   },
 } as const
 
-/** Theme-switch surface response — used by ThemeToggle and any control that
- *  mutates global theme state. A single quick scale "breath" gives the toggle
- *  tactile closure without competing with the full-page crossfade itself
- *  (owned by the View Transition / .theme-animating fallback). */
-export const themeSurfaceTransition = {
-  initial: false,
-  animate: {
-    scale: [1, 0.96, 1],
-    transition: { duration: durations.control, ease: easings.out },
-  },
-} as const
-
 /** Verification-in-progress indicator: one confident sweep, not a spinner
  *  theatre. Driven by state, so it never fabricates success. */
 export const verifySweep = {
