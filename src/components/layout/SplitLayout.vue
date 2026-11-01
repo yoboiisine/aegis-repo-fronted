@@ -1,35 +1,75 @@
 <script setup lang="ts">
 /**
- * SplitLayout - Consistent split-panel layout for list/detail views
- * Used by Passwords and API Keys pages
+ * SplitLayout — list/detail panel layout used by credential views.
+ *
+ * Responsive behaviour:
+ *  - lg+ (≥1024 px): side-by-side panels. Sidebar is 360 px wide; detail
+ *    panel takes the remaining flex space.
+ *  - Below lg: stacked. When nothing is selected the sidebar fills the full
+ *    width. Selecting a credential hides the sidebar and shows the detail
+ *    panel full-width. A visible "Back" bar at the top of the detail panel
+ *    on small screens lets users return to the list without hunting for the
+ *    close button inside the detail header.
+ *
+ * The close button in CredentialList (store.selectCredential(null)) also
+ * returns to the list on mobile automatically via hasSelection going false.
  */
-withDefaults(defineProps<{
-  sidebarWidth?: string
-}>(), {
-  sidebarWidth: '380px'
-})
+import { computed } from 'vue';
+import { ArrowLeft } from 'lucide-vue-next';
+import { useVaultStore } from '@/stores/vaultStore';
+
+withDefaults(defineProps<{ sidebarWidth?: string }>(), {
+  sidebarWidth: '360px',
+});
+
+const store = useVaultStore();
+const hasSelection = computed(() => store.selectedCredential !== null);
 </script>
 
 <template>
-  <div class="h-full flex">
-    <!-- Sidebar Panel -->
-    <div 
-      class="border-r flex flex-col overflow-hidden"
-      :style="{ 
-        width: sidebarWidth,
+  <div class="h-full flex overflow-hidden">
+    <!-- Sidebar panel -->
+    <div
+      class="flex flex-col overflow-hidden border-r shrink-0 lg:w-[360px]"
+      :class="hasSelection ? 'hidden lg:flex' : 'flex w-full'"
+      :style="{
         borderColor: 'var(--border-subtle)',
-        background: 'var(--surface-primary)'
+        background: 'var(--surface-primary)',
       }"
     >
       <slot name="sidebar" />
     </div>
 
-    <!-- Detail Panel -->
-    <div 
-      class="flex-1 overflow-y-auto"
+    <!-- Detail panel -->
+    <div
+      class="flex-1 min-w-0 overflow-hidden flex flex-col"
+      :class="hasSelection ? 'flex' : 'hidden lg:flex'"
       :style="{ background: 'var(--surface-base)' }"
     >
-      <slot name="detail" />
+      <!-- Mobile back-to-list bar (only visible below lg) -->
+      <div
+        v-if="hasSelection"
+        class="lg:hidden shrink-0 flex items-center px-3 py-2 border-b"
+        :style="{
+          background: 'var(--surface-primary)',
+          borderColor: 'var(--border-subtle)',
+        }"
+      >
+        <button
+          type="button"
+          class="flex items-center gap-1.5 text-[12px] font-medium transition-colors"
+          :style="{ color: 'var(--text-secondary)' }"
+          @click="store.selectCredential(null)"
+          aria-label="Back to credential list"
+        >
+          <ArrowLeft :size="14" aria-hidden="true" />
+          Back to list
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto">
+        <slot name="detail" />
+      </div>
     </div>
   </div>
 </template>

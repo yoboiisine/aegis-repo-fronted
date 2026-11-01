@@ -65,7 +65,7 @@ const stickyStripStyle = {
     </motion.div>
 
     <div :ref="setScroller" class="flex-1 min-h-0 overflow-y-auto">
-      <div class="max-w-[1600px] mx-auto px-6 py-5 space-y-5">
+      <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-5">
         <slot />
       </div>
     </div>

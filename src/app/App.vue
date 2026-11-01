@@ -86,7 +86,9 @@ watch(() => store.isUnlocked, (unlocked) => {
       >
         <AppSidebar />
 
-        <main class="flex-1 flex flex-col overflow-hidden relative">
+        <!-- pt-12 on mobile reserves space for the hamburger toggle button;
+             cleared at lg+ where the sidebar is always visible. -->
+        <main class="flex-1 flex flex-col overflow-hidden relative pt-12 lg:pt-0">
           <!-- Directional page transitions. mode="wait" guarantees the exiting
                page is fully removed before the next mounts: no stale content,
                no overlap even under rapid repeated navigation. Keyed by page

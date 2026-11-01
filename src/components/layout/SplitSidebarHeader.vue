@@ -9,7 +9,7 @@ defineProps<{
 </script>
 
 <template>
-  <div class="px-5 pt-5 pb-4 border-b" :style="{ borderColor: 'var(--border-subtle)' }">
+  <div class="px-5 pt-14 lg:pt-5 pb-4 border-b" :style="{ borderColor: 'var(--border-subtle)' }">
     <div class="flex items-center justify-between mb-3">
       <div class="min-w-0 flex-1">
         <h1 class="text-[18px] font-semibold tracking-tight text-[var(--text-primary)] leading-tight truncate">
