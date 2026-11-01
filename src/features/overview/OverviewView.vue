@@ -227,8 +227,8 @@ function formatTimeAgo(dateStr: string): string {
     <!-- Main Content: Viewport-triggered Scroll Reveal -->
     <MotionReveal :once="true" :amount="0.12" class="mt-6">
       <Grid :cols="3" gap="sm">
-        <!-- Recent Activity Feed (2 Cols) -->
-        <div class="col-span-2">
+        <!-- Recent Activity Feed (2 Cols on lg+, full width otherwise) -->
+        <div class="col-span-1 sm:col-span-2 lg:col-span-2">
           <Card padding="sm">
             <Section title="Recent Activity" :icon="Activity">
               <div v-if="store.activity.length === 0" class="py-6 text-center">

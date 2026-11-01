@@ -1,16 +1,29 @@
 <script setup lang="ts">
 /**
- * SecurityView — session & protection status.
+ * SecurityView — session and security status.
  *
- * Motion: sticky storytelling composition for the protection explainer —
- * the "how the vault protects you" panel holds while its three assurance
- * steps scroll past (Layer 03). It releases naturally at the end of its
- * section, collapses to a normal stacked layout on small screens, and is
- * disabled under reduced motion (content order stays identical either way).
- * Cards themselves enter with one-time viewport reveals.
+ * Layout:
+ *  - Session status: current state, session age, and auto-lock display.
+ *  - Security posture: individually explained indicators replacing any
+ *    aggregate score. Each indicator is either confirmed or described as
+ *    prototype-only to avoid misleading users about real backend guarantees.
+ *  - Protection model: sticky storytelling composition (the explainer panel
+ *    holds while three assurance steps scroll past on large screens;
+ *    stacks vertically on tablet and mobile).
+ *  - Recovery guidance.
+ *  - Lock now action.
+ *
+ * Constraints honoured:
+ *  - No numerical "security score" — only individually labelled indicators.
+ *  - Auto-lock timeout displayed as the frontend session preference only,
+ *    clearly marked as a prototype value.
+ *  - Locking clears sensitive state immediately; no animation gate.
+ *  - No fake backend operations implied.
  */
-import { Shield, Lock, Key } from 'lucide-vue-next';
+import { computed } from 'vue';
+import { Shield, Lock, Key, CheckCircle2, AlertCircle, Clock, Database, ShieldOff } from 'lucide-vue-next';
 import { useVaultStore } from '@/stores/vaultStore';
+import { useSessionPreferences } from '@/composables/useSessionPreferences';
 import PageContainer from '@/components/layout/PageContainer.vue';
 import PageHeader from '@/components/layout/PageHeader.vue';
 import Card from '@/components/ui/Card.vue';
@@ -19,11 +32,79 @@ import KeyValue from '@/components/ui/KeyValue.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import { MotionReveal, MotionStagger, MotionStaggerItem, ScrollProgressBar } from '@/motion/components';
 import { pageScroller } from '@/motion/composables/useScrollContainer';
-import { buttonInteraction } from '@/motion/presets';
 import { staggers } from '@/motion/tokens';
-import { motion } from 'motion-v';
 
 const store = useVaultStore();
+
+/**
+ * Shared session-preference state — the same singleton refs the Settings
+ * view edits, so the displayed auto-lock value always matches the current
+ * selection instead of a hardcoded constant.
+ */
+const { autoLockLabel } = useSessionPreferences();
+
+function formatTimeAgo(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+}
+
+/**
+ * Individual security indicators — each carries its own explanation and an
+ * honest note about whether it reflects a real backend guarantee or a
+ * frontend prototype state. No aggregate score is derived from these.
+ */
+const indicators = computed(() => [
+  {
+    id: 'session',
+    label: 'Active session',
+    description: 'The vault is currently unlocked and accessible.',
+    status: store.isUnlocked ? 'ok' : 'warn',
+    note: null,
+  },
+  {
+    id: 'local-first',
+    label: 'Local-first storage',
+    description: 'Credentials are stored in your local environment. The frontend never holds encryption keys.',
+    status: 'ok' as const,
+    note: null,
+  },
+  {
+    id: 'autolock',
+    label: 'Auto-lock timeout',
+    // Reflects the shared session-preference state (editable in Settings).
+    description: `Frontend session preference is set to ${autoLockLabel.value}.`,
+    status: 'ok' as const,
+    note: 'Prototype: this preference is frontend state only and not enforced by the backend.',
+  },
+  {
+    id: 'clipboard',
+    label: 'Clipboard hygiene',
+    description: 'Copied secrets are not written to permanent storage by this application.',
+    status: 'ok' as const,
+    note: 'The operating system clipboard is outside this application\'s control.',
+  },
+  {
+    id: 'backend-crypto',
+    label: 'Cryptographic operations',
+    description: 'All KDF, encryption, and decryption operations are performed by the backend service.',
+    status: 'info' as const,
+    note: 'Currently running against the mock adapter — no real cryptography is performed in this prototype.',
+  },
+  {
+    id: 'recovery',
+    label: 'Recovery key configured',
+    description: 'An emergency recovery key was provided during vault setup.',
+    status: 'info' as const,
+    note: 'Recovery key status requires backend confirmation.',
+  },
+]);
 
 /** The three assurances shown alongside the sticky explainer. */
 const protections = [
@@ -40,18 +121,6 @@ const protections = [
     body: 'Locking clears sensitive state instantly; animation never delays securing the vault.',
   },
 ];
-
-function formatTimeAgo(dateStr: string): string {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
-}
 </script>
 
 <template>
@@ -68,36 +137,119 @@ function formatTimeAgo(dateStr: string): string {
     <MotionReveal tag="header" :distance="12" :once="true">
       <PageHeader
         title="Security"
-        description="Vault session and security controls"
+        description="Vault session status and security posture"
       />
     </MotionReveal>
 
     <!-- Session Status -->
-    <MotionReveal :once="true" :amount="0.25">
+    <MotionReveal :once="true" :amount="0.2">
       <Card padding="md">
         <Section title="Session Status" :icon="Shield">
           <div class="space-y-2.5">
-            <KeyValue label="Status">
-              <span class="flex items-center gap-1.5 text-[10px] font-medium text-[var(--success)]">
-                <span class="w-1.5 h-1.5 rounded-full" :style="{ background: 'var(--success)' }" />
-                Active
+            <KeyValue label="State">
+              <span class="flex items-center gap-1.5 text-[11px] font-medium"
+                :style="{ color: store.isUnlocked ? 'var(--success)' : 'var(--danger)' }">
+                <span
+                  class="w-1.5 h-1.5 rounded-full"
+                  :style="{ background: store.isUnlocked ? 'var(--success)' : 'var(--danger)' }"
+                />
+                {{ store.isUnlocked ? 'Unlocked & Active' : 'Locked' }}
               </span>
             </KeyValue>
             <KeyValue label="Unlocked">
-              <span class="text-[10px] tabular-nums text-[var(--text-primary)]">
-                {{ store.status.lastUnlockedAt ? formatTimeAgo(store.status.lastUnlockedAt) + ' ago' : '—' }}
+              <span class="text-[11px] tabular-nums text-[var(--text-primary)]">
+                {{ store.status.lastUnlockedAt
+                    ? formatTimeAgo(store.status.lastUnlockedAt) + ' ago'
+                    : '—' }}
               </span>
             </KeyValue>
-            <KeyValue label="Auto-lock timeout">
-              <span class="text-[10px] tabular-nums text-[var(--text-primary)]">15 minutes</span>
+            <KeyValue label="Auto-lock (prototype)">
+              <span class="flex items-center gap-1.5">
+                <span class="text-[11px] tabular-nums text-[var(--text-primary)]">{{ autoLockLabel }}</span>
+                <span
+                  class="text-[9px] font-mono px-1 py-0.5 rounded"
+                  :style="{ color: 'var(--warning)', background: 'var(--warning-muted)' }"
+                >
+                  SIM
+                </span>
+              </span>
+            </KeyValue>
+            <KeyValue label="Vault ID">
+              <span class="text-[10px] font-mono text-[var(--text-tertiary)] max-w-[140px] truncate">
+                {{ store.status.vaultId ?? '—' }}
+              </span>
             </KeyValue>
           </div>
         </Section>
       </Card>
     </MotionReveal>
 
-    <!-- Sticky protection storytelling: the explainer panel holds while the
-         assurance steps scroll by. Releases naturally; stacks on mobile. -->
+    <!-- Security indicators (per-item, no aggregate score) -->
+    <MotionReveal :once="true" :amount="0.15">
+      <Card padding="md">
+        <Section title="Security Posture" :icon="Shield">
+          <p class="text-[11px] text-[var(--text-tertiary)] -mt-1 mb-3">
+            Individual security properties — each is explained separately. No aggregate
+            score is derived because individual context matters more than a single number.
+          </p>
+
+          <div class="space-y-2">
+            <div
+              v-for="ind in indicators"
+              :key="ind.id"
+              class="flex items-start gap-3 p-3 rounded-lg border"
+              :style="{
+                background: ind.status === 'ok'
+                  ? 'var(--success-muted)'
+                  : ind.status === 'warn'
+                  ? 'var(--warning-muted)'
+                  : 'var(--surface-secondary)',
+                borderColor: ind.status === 'ok'
+                  ? 'var(--success)' + '35'
+                  : ind.status === 'warn'
+                  ? 'var(--warning)' + '35'
+                  : 'var(--border-subtle)',
+              }"
+            >
+              <!-- Icon -->
+              <div class="shrink-0 mt-0.5">
+                <CheckCircle2
+                  v-if="ind.status === 'ok'"
+                  :size="14"
+                  :style="{ color: 'var(--success)' }"
+                />
+                <AlertCircle
+                  v-else-if="ind.status === 'warn'"
+                  :size="14"
+                  :style="{ color: 'var(--warning)' }"
+                />
+                <Database
+                  v-else
+                  :size="14"
+                  :style="{ color: 'var(--text-tertiary)' }"
+                />
+              </div>
+
+              <!-- Text -->
+              <div class="flex-1 min-w-0">
+                <p class="text-[12px] font-medium text-[var(--text-primary)]">{{ ind.label }}</p>
+                <p class="text-[11px] mt-0.5 leading-relaxed text-[var(--text-tertiary)]">{{ ind.description }}</p>
+                <!-- Per-indicator prototype note -->
+                <p
+                  v-if="ind.note"
+                  class="text-[10px] mt-1 italic"
+                  :style="{ color: 'var(--text-disabled)' }"
+                >
+                  {{ ind.note }}
+                </p>
+              </div>
+            </div>
+          </div>
+        </Section>
+      </Card>
+    </MotionReveal>
+
+    <!-- Sticky protection storytelling: stacks on mobile, side-by-side on large screens -->
     <div class="grid grid-cols-1 lg:grid-cols-5 gap-5">
       <div class="lg:col-span-2">
         <div class="lg:sticky lg:top-16">
@@ -106,11 +258,12 @@ function formatTimeAgo(dateStr: string): string {
               <Section title="How Aegis Protects You" :icon="Shield">
                 <p class="text-[12px] leading-relaxed text-[var(--text-secondary)]">
                   Aegis treats every session as temporary and every secret as
-                  borrowed. These are the guarantees that hold while the vault
+                  borrowed. These are the design guarantees that hold while the vault
                   is open — scroll through them beside this panel.
                 </p>
                 <p class="text-[10px] mt-3 italic text-[var(--text-disabled)]">
-                  Prototype presentation — backend wiring remains authoritative.
+                  Prototype presentation — backend wiring remains authoritative for
+                  all real security operations.
                 </p>
               </Section>
             </Card>
@@ -124,7 +277,12 @@ function formatTimeAgo(dateStr: string): string {
             <div class="flex items-start gap-3">
               <div
                 class="w-7 h-7 rounded-md flex items-center justify-center shrink-0 text-[11px] font-semibold tabular-nums"
-                :style="{ background: 'var(--gold-surface)', color: 'var(--gold)', border: '1px solid var(--gold-border)', boxShadow: 'var(--specular-rim-gold)' }"
+                :style="{
+                  background: 'var(--gold-surface)',
+                  color: 'var(--gold)',
+                  border: '1px solid var(--gold-border)',
+                  boxShadow: 'var(--specular-rim-gold)',
+                }"
               >
                 {{ i + 1 }}
               </div>
@@ -138,14 +296,14 @@ function formatTimeAgo(dateStr: string): string {
       </MotionStagger>
     </div>
 
-    <!-- Lock -->
+    <!-- Lock now -->
     <MotionReveal :once="true" :amount="0.25">
       <Card padding="md">
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <p class="text-[13px] font-medium text-[var(--text-primary)]">Lock Vault</p>
             <p class="text-[11px] text-[var(--text-tertiary)] mt-0.5">
-              Immediately secure all credentials and end session
+              Immediately end the session and clear all sensitive state
             </p>
           </div>
           <!-- store.lock() runs synchronously on click; sensitive state is
@@ -158,19 +316,23 @@ function formatTimeAgo(dateStr: string): string {
       </Card>
     </MotionReveal>
 
-    <!-- Recovery -->
+    <!-- Recovery guidance -->
     <MotionReveal :once="true" :amount="0.25">
       <Card padding="md">
         <Section title="Recovery" :icon="Key">
           <div
             class="p-3 rounded-md border"
-            :style="{ background: 'var(--warning-muted)', borderColor: 'var(--warning)' + '30' }"
+            :style="{
+              background: 'var(--warning-muted)',
+              borderColor: 'var(--warning)' + '30',
+            }"
           >
             <p class="text-[12px] text-[var(--text-secondary)]">
-              Your recovery key is an emergency backup for when you forget your master passphrase. Store it securely offline.
+              Your recovery key is an emergency backup for when you forget your master passphrase.
+              Store it securely offline — never digitally alongside the vault itself.
             </p>
             <p class="text-[10px] mt-2 italic text-[var(--text-disabled)]">
-              Recovery key management requires backend support.
+              Recovery key management requires backend support. This prototype uses a mock adapter.
             </p>
           </div>
         </Section>
