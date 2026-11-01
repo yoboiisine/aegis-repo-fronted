@@ -43,7 +43,9 @@ const mobileOpen = ref(false);
 // and is restored to the hamburger when it closes.
 const hamburgerButtonRef = ref<HTMLButtonElement | null>(null);
 const drawerRef = ref<HTMLElement | null>(null);
-function openSidebar() { mobileOpen.value = true; }
+/** Toggle the mobile drawer — genuine open/close switch so the advertised
+ *  label ("Open/Close navigation menu") always matches the actual action. */
+function toggleSidebar() { mobileOpen.value = !mobileOpen.value; }
 function closeSidebar() { mobileOpen.value = false; }
 
 /** Query all focusable elements within an element. */
@@ -141,7 +143,7 @@ async function handleLock() {
     type="button"
     :aria-label="mobileOpen ? 'Close navigation menu' : 'Open navigation menu'"
     :aria-expanded="mobileOpen"
-    @click="openSidebar"
+    @click="toggleSidebar"
     v-bind="reduced ? {} : iconButtonInteraction"
     class="lg:hidden fixed top-3 left-3 z-50 w-8 h-8 rounded-md flex items-center justify-center border"
     :style="{
