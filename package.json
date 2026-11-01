@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "typecheck": "vue-tsc --noEmit -p tsconfig.json",
-    "test": "tsx tests/vaultLifecycle.test.ts && tsx tests/visualSystem.test.ts && tsx tests/credentialModels.test.ts && tsx tests/credentialManagement.test.ts"
+    "test": "tsx tests/vaultLifecycle.test.ts && tsx tests/visualSystem.test.ts && tsx tests/credentialModels.test.ts && tsx tests/credentialManagement.test.ts && tsx tests/motionChoreography.test.ts"
   },
   "dependencies": {
     "lucide-vue-next": "^0.469.0",
