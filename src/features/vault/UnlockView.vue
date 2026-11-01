@@ -10,24 +10,26 @@
  * 5. Master passphrase vault unlocking
  * 6. Recovery key entry and recovery states
  * 7. Lock failure handling & reconciliation
- * 8. Development testing mock switcher
+ * 8. Status reconciliation handling when auth succeeds but sync fails
+ * 9. Development testing mock switcher (strictly gated by import.meta.env.DEV)
  */
 import { ref, computed } from 'vue';
 import { motion, AnimatePresence } from 'motion-v';
-import { Shield, Sparkles, RefreshCw, AlertTriangle, Loader2 } from 'lucide-vue-next';
+import { Shield, Sparkles, RefreshCw, AlertTriangle } from 'lucide-vue-next';
 import { useVaultStore } from '@/stores/vaultStore';
 import { useAppReducedMotion } from '@/motion/composables/useReducedMotion';
 import { emblemPulse } from '@/motion/presets';
 import GlassPanel from '@/components/ui/GlassPanel.vue';
 import AppButton from '@/components/ui/AppButton.vue';
 import AppSpinner from '@/components/ui/AppSpinner.vue';
-import { setMockVaultState } from '@/services/mock/mockVaultClient';
 
 // Cards
 import VaultSetupCard from './VaultSetupCard.vue';
 import VaultRecoverySetupCard from './VaultRecoverySetupCard.vue';
 import VaultUnlockCard from './VaultUnlockCard.vue';
 import VaultRecoveryCard from './VaultRecoveryCard.vue';
+
+const isDev = Boolean(import.meta.env?.DEV);
 
 const store = useVaultStore();
 const { reduced } = useAppReducedMotion();
@@ -53,8 +55,10 @@ function cancelRecovery() {
   isRecoveryMode.value = false;
 }
 
-// Development testing state switcher
+// Development testing state switcher — strictly development-only
 async function toggleMockState(state: 'uninitialized' | 'locked') {
+  if (!isDev) return;
+  const { setMockVaultState } = await import('@/services/mock/mockVaultClient');
   setMockVaultState(state);
   await store.init();
   isRecoveryMode.value = false;
@@ -132,6 +136,37 @@ async function toggleMockState(state: 'uninitialized' | 'locked') {
         >
           <span v-if="store.isLocking">Retrying...</span>
           <span v-else>Retry Lock</span>
+        </button>
+      </div>
+
+      <!-- Reconciliation Error Banner -->
+      <div
+        v-if="store.reconciliationError"
+        role="alert"
+        class="w-full mb-4 p-3.5 rounded-lg border flex items-start justify-between gap-3 text-[12px]"
+        :style="{
+          background: 'var(--warning-muted)',
+          borderColor: 'var(--warning)',
+          color: 'var(--text-primary)',
+        }"
+      >
+        <div class="flex items-start gap-2.5">
+          <AlertTriangle :size="16" class="shrink-0 mt-0.5" :style="{ color: 'var(--warning)' }" />
+          <span>{{ store.reconciliationError }}</span>
+        </div>
+        <button
+          type="button"
+          class="px-2.5 py-1 text-[11px] font-semibold rounded shrink-0 border transition-colors cursor-pointer"
+          :style="{
+            borderColor: 'var(--warning)',
+            background: 'var(--surface-primary)',
+            color: 'var(--warning)',
+          }"
+          :disabled="store.isReconciling"
+          @click="store.reconcileStatus()"
+        >
+          <span v-if="store.isReconciling">Syncing...</span>
+          <span v-else>Retry Sync</span>
         </button>
       </div>
 
@@ -250,8 +285,9 @@ async function toggleMockState(state: 'uninitialized' | 'locked') {
         </AnimatePresence>
       </GlassPanel>
 
-      <!-- Development Mock Adapter Status & State Switcher -->
+      <!-- Development Mock Adapter Status & State Switcher (DEVELOPMENT ONLY) -->
       <motion.div
+        v-if="isDev"
         :initial="{ opacity: 0 }"
         :animate="{ opacity: 1 }"
         :transition="{ delay: 0.3, duration: 0.4 }"
@@ -264,7 +300,7 @@ async function toggleMockState(state: 'uninitialized' | 'locked') {
           <span class="font-mono uppercase">{{ store.isInitializing ? 'connecting' : (store.initError ? 'unavailable' : store.status.state) }}</span>
         </div>
 
-        <!-- Testing Switcher: allows reviewers to test both flows -->
+        <!-- Testing Switcher: allows developers/reviewers in DEV mode to test both flows -->
         <div
           class="inline-flex items-center gap-1.5 p-1 rounded-md border text-[11px]"
           :style="{

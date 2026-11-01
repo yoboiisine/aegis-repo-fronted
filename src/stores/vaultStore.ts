@@ -31,7 +31,7 @@ export function getVaultClient(): VaultClient {
 
 export const useVaultStore = defineStore('vault', () => {
   // State
-  // Status is initialized to a locked placeholder but gated by isInitializing
+  // Status starts as a locked placeholder but is gated by isInitializing
   const status = ref<VaultStatus>({ state: 'locked' });
   const isInitializing = ref(true);
   const initError = ref<string | null>(null);
@@ -56,8 +56,12 @@ export const useVaultStore = defineStore('vault', () => {
   const isRecovering = ref(false);
   const isLocking = ref(false);
   const lockError = ref<string | null>(null);
+  const isReconciling = ref(false);
+  const reconciliationError = ref<string | null>(null);
   const recoveryKeyPresented = ref<string | null>(null);
   const currentPage = ref<PageId>('overview');
+
+  let pendingInitPromise: Promise<void> | null = null;
 
   // Computed — strictly gated on confirmed backend status without connection errors
   const isUnlocked = computed(
@@ -114,16 +118,47 @@ export const useVaultStore = defineStore('vault', () => {
   }
 
   async function init(): Promise<void> {
+    if (pendingInitPromise) {
+      return pendingInitPromise;
+    }
+
     isInitializing.value = true;
     initError.value = null;
     error.value = null;
+    reconciliationError.value = null;
+
+    pendingInitPromise = (async () => {
+      try {
+        const s = await activeClient.getVaultStatus();
+        status.value = s;
+      } catch {
+        initError.value = 'Failed to connect to the backend vault service. Please verify that the backend is running.';
+      } finally {
+        isInitializing.value = false;
+        pendingInitPromise = null;
+      }
+    })();
+
+    return pendingInitPromise;
+  }
+
+  /**
+   * Reconciles authoritative vault status from the backend service.
+   * Separates status synchronization from raw authentication execution.
+   */
+  async function reconcileStatus(): Promise<boolean> {
+    isReconciling.value = true;
+    reconciliationError.value = null;
     try {
       const s = await activeClient.getVaultStatus();
       status.value = s;
+      return true;
     } catch {
-      initError.value = 'Failed to connect to the backend vault service. Please verify that the backend is running.';
+      reconciliationError.value =
+        'Authentication succeeded, but client failed to confirm updated session status from backend. Click below to retry synchronization.';
+      return false;
     } finally {
-      isInitializing.value = false;
+      isReconciling.value = false;
     }
   }
 
@@ -133,6 +168,7 @@ export const useVaultStore = defineStore('vault', () => {
     }
     isCreating.value = true;
     error.value = null;
+    reconciliationError.value = null;
     try {
       const result = await activeClient.createVault(passphrase, confirm);
       if (result.success) {
@@ -156,17 +192,32 @@ export const useVaultStore = defineStore('vault', () => {
     }
   }
 
-  async function completeSetup() {
-    recoveryKeyPresented.value = null;
+  async function completeSetup(): Promise<boolean> {
     error.value = null;
-    const s = await activeClient.getVaultStatus();
-    status.value = s;
-    notify({ type: 'success', title: 'Vault created and unlocked' });
+    try {
+      const s = await activeClient.getVaultStatus();
+      status.value = s;
+      // ONLY clear the presented recovery key once the transition to unlocked status is confirmed!
+      recoveryKeyPresented.value = null;
+      notify({ type: 'success', title: 'Vault created and unlocked' });
+      return true;
+    } catch {
+      // Retain recoveryKeyPresented so the user does NOT lose their key if status fetch fails!
+      error.value =
+        'Vault was created, but failed to confirm updated status. Your recovery key is retained above. Please retry completing setup.';
+      notify({
+        type: 'warning',
+        title: 'Status Confirmation Failed',
+        message: 'Could not confirm vault status. Your recovery key is retained. Please retry.',
+      });
+      return false;
+    }
   }
 
   function cancelSetup() {
     recoveryKeyPresented.value = null;
     error.value = null;
+    reconciliationError.value = null;
   }
 
   async function unlock(passphrase: string): Promise<boolean> {
@@ -175,23 +226,40 @@ export const useVaultStore = defineStore('vault', () => {
     }
     isUnlocking.value = true;
     error.value = null;
+    reconciliationError.value = null;
+
+    let authSuccess = false;
     try {
       const result = await activeClient.unlockVault(passphrase);
       if (result.success) {
-        const s = await activeClient.getVaultStatus();
-        status.value = s;
-        notify({ type: 'success', title: 'Vault unlocked' });
-        return true;
+        authSuccess = true;
       } else {
         error.value = result.error ?? 'Invalid passphrase';
         return false;
       }
     } catch {
-      error.value = 'Failed to unlock vault';
+      error.value = 'Failed to execute unlock operation';
       return false;
     } finally {
       isUnlocking.value = false;
     }
+
+    if (authSuccess) {
+      // Distinguish authentication success from status synchronization
+      const reconciled = await reconcileStatus();
+      if (reconciled) {
+        notify({ type: 'success', title: 'Vault unlocked' });
+        return true;
+      } else {
+        notify({
+          type: 'warning',
+          title: 'Session Unsynchronized',
+          message: 'Vault was unlocked on backend, but status could not be synchronized.',
+        });
+        return false;
+      }
+    }
+    return false;
   }
 
   async function recover(recoveryKey: string): Promise<boolean> {
@@ -200,6 +268,9 @@ export const useVaultStore = defineStore('vault', () => {
     }
     isRecovering.value = true;
     error.value = null;
+    reconciliationError.value = null;
+
+    let authSuccess = false;
     try {
       if (typeof activeClient.recoverVault !== 'function') {
         error.value = 'Emergency recovery is not supported by the active backend.';
@@ -207,25 +278,45 @@ export const useVaultStore = defineStore('vault', () => {
       }
       const result = await activeClient.recoverVault(recoveryKey);
       if (result.success) {
-        const s = await activeClient.getVaultStatus();
-        status.value = s;
-        notify({ type: 'success', title: 'Vault recovered successfully' });
-        return true;
+        authSuccess = true;
       } else {
         error.value = result.error ?? 'Invalid recovery key';
         return false;
       }
     } catch {
-      error.value = 'Failed to recover vault';
+      error.value = 'Failed to execute recovery operation';
       return false;
     } finally {
       isRecovering.value = false;
     }
+
+    if (authSuccess) {
+      // Distinguish authentication success from status synchronization
+      const reconciled = await reconcileStatus();
+      if (reconciled) {
+        notify({ type: 'success', title: 'Vault recovered successfully' });
+        return true;
+      } else {
+        notify({
+          type: 'warning',
+          title: 'Session Unsynchronized',
+          message: 'Vault was recovered on backend, but status could not be synchronized.',
+        });
+        return false;
+      }
+    }
+    return false;
   }
 
   async function lock(): Promise<boolean> {
+    // Concurrency guard: ignore duplicate simultaneous lock requests
+    if (isLocking.value) {
+      return false;
+    }
+
     isLocking.value = true;
     lockError.value = null;
+    reconciliationError.value = null;
 
     // Immediate reactive state hygiene: scrub cached credentials and keys from frontend memory
     credentials.value = [];
@@ -243,7 +334,8 @@ export const useVaultStore = defineStore('vault', () => {
       notify({ type: 'info', title: 'Vault locked' });
       return true;
     } catch {
-      lockError.value = 'Backend failed to terminate vault session. Sensitive frontend state was purged, but backend lock could not be confirmed.';
+      lockError.value =
+        'Backend failed to terminate vault session. Sensitive frontend state was purged, but backend lock could not be confirmed.';
       notify({
         type: 'error',
         title: 'Lock Unconfirmed',
@@ -357,9 +449,10 @@ export const useVaultStore = defineStore('vault', () => {
   return {
     status, isInitializing, initError, credentials, passwords, apiKeys, selectedCredential,
     activity, notifications, filters, isLoading, error,
-    isCreating, isUnlocking, isRecovering, isLocking, lockError, recoveryKeyPresented, currentPage,
+    isCreating, isUnlocking, isRecovering, isLocking, lockError,
+    isReconciling, reconciliationError, recoveryKeyPresented, currentPage,
     isUnlocked, isUninitialized, isLocked, filteredPasswords, filteredApiKeys,
-    notify, dismissNotification, init, setupVault, completeSetup, cancelSetup,
+    notify, dismissNotification, init, reconcileStatus, setupVault, completeSetup, cancelSetup,
     unlock, recover, lock, retryLock,
     loadAll, loadActivity, selectCredential,
     createCredential, updateCredential, deleteCredential,

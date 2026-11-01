@@ -34,6 +34,7 @@ const { reduced } = useAppReducedMotion();
 const isRevealed = ref(false);
 const hasCopied = ref(false);
 const isConfirmed = ref(false);
+const isCompleting = ref(false);
 const copyTimeout = ref<number | null>(null);
 
 const rawKey = computed(() => store.recoveryKeyPresented || '');
@@ -61,8 +62,13 @@ async function copyToClipboard() {
 }
 
 async function handleComplete() {
-  if (!isConfirmed.value) return;
-  await store.completeSetup();
+  if (!isConfirmed.value || isCompleting.value) return;
+  isCompleting.value = true;
+  try {
+    await store.completeSetup();
+  } finally {
+    isCompleting.value = false;
+  }
 }
 
 onBeforeUnmount(() => {
@@ -188,6 +194,22 @@ onBeforeUnmount(() => {
       </label>
     </div>
 
+    <!-- Setup Completion Status Error (preserves key) -->
+    <div
+      v-if="store.error"
+      role="alert"
+      aria-live="polite"
+      class="p-3 mb-4 rounded-md border flex items-start gap-2.5 text-[12px]"
+      :style="{
+        background: 'var(--warning-muted)',
+        borderColor: 'var(--warning)',
+        color: 'var(--text-primary)',
+      }"
+    >
+      <AlertTriangle :size="15" class="shrink-0 mt-0.5" :style="{ color: 'var(--warning)' }" />
+      <span>{{ store.error }}</span>
+    </div>
+
     <!-- Complete Action Button -->
     <div>
       <AppButton
@@ -195,11 +217,12 @@ onBeforeUnmount(() => {
         variant="gold"
         size="lg"
         class="w-full"
-        :disabled="!isConfirmed"
+        :disabled="!isConfirmed || isCompleting"
+        :loading="isCompleting"
         @click="handleComplete"
       >
         <span>Complete Setup & Enter Vault</span>
-        <ArrowRight :size="14" />
+        <ArrowRight v-if="!isCompleting" :size="14" />
       </AppButton>
     </div>
   </div>

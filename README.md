@@ -4,7 +4,7 @@ Premium, local-first password & API-key vault frontend. This repository contains
 - **Phase 0:** Repository reconnaissance, technical assessment, and architectural planning.
 - **Phase 1:** Cinematic Glassmorphism design system, token architecture (Glacier light / Midnight dark), glass primitives, UI primitives, and motion foundation.
 - **Phase 2:** Application shell, navigation structure, and page transitions.
-- **Phase 3:** Complete vault lifecycle and authentication experience: first-run setup, recovery-key presentation and confirmation, passphrase unlocking, emergency recovery entry, manual locking with synchronous memory zeroing, and locked/unlocked transitions.
+- **Phase 3:** Complete vault lifecycle and authentication experience: first-run setup, recovery-key presentation and confirmation, passphrase unlocking, emergency recovery entry, manual locking with immediate frontend reactive state clearing, status reconciliation, and locked/unlocked transitions.
 
 ## Phase 3: Vault Lifecycle & Authentication
 
@@ -37,13 +37,18 @@ Phase 3 delivers the complete vault lifecycle experience:
    - Clean cancellation returning to standard master passphrase entry.
 
 5. **Manual Vault Locking (`store.lock()`):**
-   - Synchronous, immediate security wipe: all in-memory credentials, passwords, API keys, selected items, activity, and presented keys are zeroed out before network or animation delays.
-   - Smooth presentation-only transition back to the locked vault view.
+   - Immediate frontend state hygiene: all reactive in-memory credentials, passwords, API keys, selected items, activity, and presented recovery keys are cleared from frontend state before network or animation delays (without claiming cryptographic memory zeroization).
+   - Backend session confirmation: authoritative status transition to `locked` is only set once the backend confirms session termination, with graceful error handling and retry mechanisms (`retryLock()`) if backend teardown fails.
 
-6. **Development Mock Testing Adapter (`mockVaultClient.ts`):**
+6. **Status Reconciliation & Resilient Authentication (`store.reconcileStatus()`):**
+   - Decouples raw authentication (unlock/recovery) from backend status confirmation.
+   - If authentication succeeds on the backend but the follow-up status query fails, the store records a distinct reconciliation warning banner with a dedicated retry action (`reconcileStatus()`), preventing UI/backend state disagreement without falsely reporting credential rejection.
+   - Recovery keys presented during setup are strictly preserved until backend unlocked status is authoritatively confirmed.
+
+7. **Development Mock Testing Adapter (`mockVaultClient.ts`):**
    - Clearly identified development mock integration boundary.
    - Starts in `uninitialized` state to immediately demonstrate first-run setup.
-   - Discreet mock switcher pill in the footer allows developers and reviewers to toggle between `1. First-Run Setup` and `2. Unlock & Recovery` for testing without restarting the application.
+   - Discreet mock switcher pill in the footer is strictly development-gated (`import.meta.env.DEV`), ensuring mock controls and testing tools are excluded from production builds and never exposed in the production UI.
 
 ## Visual Identity — Cinematic Glassmorphism
 
@@ -113,7 +118,7 @@ pnpm install
 pnpm run dev        # http://localhost:3000 (showcase: /#/design-system)
 pnpm run build      # production build (Vite)
 pnpm run typecheck  # vue-tsc strict validation
-pnpm run test       # automated lifecycle test suite (12 tests)
+pnpm run test       # automated lifecycle test suite (15 tests)
 ```
 
 ## Status & Boundaries
