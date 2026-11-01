@@ -5,11 +5,13 @@
  * Responsibilities:
  * - Master passphrase creation & confirmation
  * - Real-time validation (minimum 12 characters, matching confirmation)
+ * - Refined passphrase validation feedback & strength indicator
  * - Accessible error display
  * - Double submission prevention & loading state
  * - Strict memory hygiene: clears sensitive values on success or unmount
  */
 import { ref, computed, onBeforeUnmount } from 'vue';
+import { motion, AnimatePresence } from 'motion-v';
 import { KeyRound, AlertTriangle, ShieldCheck, Check, ArrowRight } from 'lucide-vue-next';
 import { useVaultStore } from '@/stores/vaultStore';
 import AppPasswordInput from '@/components/ui/AppPasswordInput.vue';
@@ -29,6 +31,37 @@ const hasMismatch = computed(
   () => confirmPassphrase.value.length > 0 && passphrase.value !== confirmPassphrase.value,
 );
 
+// Refined strength calculation
+const strengthLevel = computed(() => {
+  const p = passphrase.value;
+  if (p.length === 0) return { score: 0, label: 'Empty', color: 'var(--text-disabled)' };
+  if (p.length < 12) return { score: 1, label: 'Too short (min 12)', color: 'var(--danger)' };
+
+  let score = 2;
+  const hasUpper = /[A-Z]/.test(p);
+  const hasLower = /[a-z]/.test(p);
+  const hasNumber = /[0-9]/.test(p);
+  const hasSymbol = /[^A-Za-z0-9]/.test(p);
+
+  const diversity = [hasUpper, hasLower, hasNumber, hasSymbol].filter(Boolean).length;
+  if (p.length >= 16 && diversity >= 3) {
+    score = 4;
+  } else if (p.length >= 14 || diversity >= 2) {
+    score = 3;
+  }
+
+  switch (score) {
+    case 2:
+      return { score: 2, label: 'Fair', color: 'var(--warning)' };
+    case 3:
+      return { score: 3, label: 'Good', color: 'var(--success)' };
+    case 4:
+      return { score: 4, label: 'Strong (Recommended)', color: 'var(--gold)' };
+    default:
+      return { score: 1, label: 'Weak', color: 'var(--danger)' };
+  }
+});
+
 const isFormValid = computed(() => hasMinLength.value && hasMatch.value);
 
 async function handleSubmit() {
@@ -46,13 +79,11 @@ async function handleSubmit() {
 
   const result = await store.setupVault(passphrase.value, confirmPassphrase.value);
   if (result.success) {
-    // Memory hygiene: clear input fields from reactive state upon successful setup
     passphrase.value = '';
     confirmPassphrase.value = '';
   }
 }
 
-// Memory hygiene: clear reactive values when component is unmounted
 onBeforeUnmount(() => {
   passphrase.value = '';
   confirmPassphrase.value = '';
@@ -103,10 +134,34 @@ onBeforeUnmount(() => {
           :autofocus="true"
           :disabled="store.isCreating"
         />
-        <!-- Passphrase requirements helper -->
+
+        <!-- Strength Indicator Bar -->
+        <div v-if="passphrase.length > 0" class="mt-2.5 space-y-1.5">
+          <div class="flex items-center justify-between text-[11px]">
+            <span class="text-[var(--text-tertiary)]">Passphrase Strength</span>
+            <span class="font-medium" :style="{ color: strengthLevel.color }">
+              {{ strengthLevel.label }}
+            </span>
+          </div>
+
+          <!-- Segmented meter -->
+          <div class="grid grid-cols-4 gap-1.5 h-1 w-full bg-[var(--surface-input)] rounded-full overflow-hidden">
+            <div
+              v-for="seg in 4"
+              :key="seg"
+              class="h-full rounded-full transition-all duration-300"
+              :style="{
+                background: seg <= strengthLevel.score ? strengthLevel.color : 'transparent',
+                opacity: seg <= strengthLevel.score ? 1 : 0.2,
+              }"
+            />
+          </div>
+        </div>
+
+        <!-- Requirements Helper -->
         <div class="mt-2 flex items-center gap-2 text-[11px]" :style="{ color: hasMinLength ? 'var(--success)' : 'var(--text-disabled)' }">
-          <Check v-if="hasMinLength" :size="12" />
-          <span v-else class="w-1.5 h-1.5 rounded-full bg-current" />
+          <Check v-if="hasMinLength" :size="12" class="shrink-0" />
+          <span v-else class="w-1.5 h-1.5 rounded-full bg-current shrink-0" />
           <span>Minimum 12 characters ({{ passphrase.length }}/12)</span>
         </div>
       </div>
@@ -134,7 +189,7 @@ onBeforeUnmount(() => {
       <div class="pt-2">
         <AppButton
           type="submit"
-          variant="primary"
+          variant="gold"
           size="lg"
           class="w-full"
           :loading="store.isCreating"
