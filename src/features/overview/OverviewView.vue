@@ -14,11 +14,12 @@
  */
 import { computed } from 'vue';
 import { motion } from 'motion-v';
-import { Key, Fingerprint, Shield, Activity, Clock, Lock } from 'lucide-vue-next';
+import { Key, Fingerprint, Shield, Activity, Clock, Lock, Plus } from 'lucide-vue-next';
 import { useVaultStore } from '@/stores/vaultStore';
 import PageContainer from '@/components/layout/PageContainer.vue';
 import PageHeader from '@/components/layout/PageHeader.vue';
 import Card from '@/components/ui/Card.vue';
+import AppButton from '@/components/ui/AppButton.vue';
 import Section from '@/components/layout/Section.vue';
 import Grid from '@/components/layout/Grid.vue';
 import { MotionReveal, MotionStagger, MotionStaggerItem, ScrollProgressBar, ParallaxLayer } from '@/motion/components';
@@ -116,7 +117,14 @@ function formatTimeAgo(dateStr: string): string {
           <PageHeader
             title="Vault Overview"
             description="Your secure credential storage at a glance"
-          />
+          >
+            <template #actions>
+              <AppButton variant="gold" size="sm" @click="store.navigate('passwords')">
+                <Plus :size="13" />
+                <span>Add Credential</span>
+              </AppButton>
+            </template>
+          </PageHeader>
         </MotionStaggerItem>
 
         <MotionStaggerItem>
@@ -126,20 +134,20 @@ function formatTimeAgo(dateStr: string): string {
               :key="stat.label"
               @click="store.navigate(stat.page)"
               v-bind="cardInteraction"
-              class="p-3 rounded-md border text-left cursor-pointer hover:border-[var(--border-default)] bg-[var(--surface-primary)] border-[var(--border-subtle)]"
+              class="a-glass a-glass--standard a-glass--interactive p-4 rounded-lg text-left cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[var(--gold-border-focus)] transition-all"
             >
-              <div class="flex items-center gap-1.5 mb-1.5">
+              <div class="flex items-center gap-1.5 mb-2">
                 <div
-                  class="w-6 h-6 rounded flex items-center justify-center"
-                  :style="{ background: `${stat.color}15` }"
+                  class="w-7 h-7 rounded-md flex items-center justify-center"
+                  :style="{ background: `${stat.color}18`, border: `1px solid ${stat.color}30` }"
                 >
-                  <component :is="stat.icon" :size="12" :style="{ color: stat.color }" />
+                  <component :is="stat.icon" :size="13" :style="{ color: stat.color }" />
                 </div>
               </div>
-              <p class="text-[20px] font-semibold tracking-tight leading-none text-[var(--text-primary)]">
+              <p class="text-[22px] font-semibold tracking-tight leading-none text-[var(--text-primary)]">
                 {{ stat.value }}
               </p>
-              <p class="text-[10px] text-[var(--text-tertiary)] mt-1">
+              <p class="text-[11px] font-medium text-[var(--text-tertiary)] mt-1.5">
                 {{ stat.label }}
               </p>
             </motion.button>

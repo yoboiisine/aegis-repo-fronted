@@ -124,7 +124,7 @@ function formatTimeAgo(dateStr: string): string {
             <div class="flex items-start gap-3">
               <div
                 class="w-7 h-7 rounded-md flex items-center justify-center shrink-0 text-[11px] font-semibold tabular-nums"
-                :style="{ background: 'var(--accent-muted)', color: 'var(--accent-primary)', border: '1px solid var(--accent-border)' }"
+                :style="{ background: 'var(--gold-surface)', color: 'var(--gold)', border: '1px solid var(--gold-border)', boxShadow: 'var(--specular-rim-gold)' }"
               >
                 {{ i + 1 }}
               </div>
@@ -150,12 +150,10 @@ function formatTimeAgo(dateStr: string): string {
           </div>
           <!-- store.lock() runs synchronously on click; sensitive state is
                cleared before any exit animation begins. -->
-          <motion.div v-bind="buttonInteraction">
-            <AppButton variant="danger" size="sm" @click="store.lock()">
-              <Lock :size="12" />
-              Lock Now
-            </AppButton>
-          </motion.div>
+          <AppButton variant="danger" size="sm" @click="store.lock()">
+            <Lock :size="12" />
+            Lock Now
+          </AppButton>
         </div>
       </Card>
     </MotionReveal>

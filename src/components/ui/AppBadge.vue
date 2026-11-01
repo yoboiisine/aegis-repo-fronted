@@ -21,27 +21,36 @@ const props = withDefaults(defineProps<Props>(), {
 const tones: Record<BadgeTone, { fg: string; bg: string; border: string }> = {
   neutral: { fg: 'var(--text-secondary)', bg: 'var(--surface-tertiary)', border: 'var(--border-subtle)' },
   accent: { fg: 'var(--accent-primary)', bg: 'var(--accent-muted)', border: 'var(--accent-border)' },
-  gold: { fg: 'var(--gold)', bg: 'var(--gold-muted)', border: 'var(--gold-border)' },
-  success: { fg: 'var(--success)', bg: 'var(--success-muted)', border: 'transparent' },
-  warning: { fg: 'var(--warning)', bg: 'var(--warning-muted)', border: 'transparent' },
-  danger: { fg: 'var(--danger)', bg: 'var(--danger-muted)', border: 'transparent' },
+  gold: { fg: 'var(--gold)', bg: 'var(--gold-surface)', border: 'var(--gold-border)' },
+  success: { fg: 'var(--success)', bg: 'var(--success-muted)', border: 'rgba(74, 222, 128, 0.25)' },
+  warning: { fg: 'var(--warning)', bg: 'var(--warning-muted)', border: 'rgba(251, 191, 36, 0.25)' },
+  danger: { fg: 'var(--danger)', bg: 'var(--danger-muted)', border: 'rgba(248, 113, 113, 0.25)' },
 }
 
 const style = computed(() => {
   const t = tones[props.tone]
-  // Solid emphasis: fill with the tone's foreground color and flip to the
-  // theme-aware on-accent ink. Translucent (default) keeps bg/border tokens.
+  // Solid emphasis: fill with the tone's foreground/gradient color and flip to the theme-aware on-accent ink.
   if (props.solid) {
+    if (props.tone === 'gold') {
+      return {
+        color: 'var(--text-on-gold)',
+        background: 'var(--gradient-gold)',
+        borderColor: 'var(--gold-border)',
+        boxShadow: 'var(--specular-rim-gold), var(--shadow-xs)',
+      }
+    }
     return {
       color: 'var(--text-on-accent)',
       background: 'var(--gradient-accent)',
       borderColor: 'transparent',
+      boxShadow: 'var(--specular-rim), var(--shadow-xs)',
     }
   }
   return {
     color: t.fg,
     background: t.bg,
     borderColor: t.border,
+    boxShadow: props.tone === 'gold' ? 'var(--shadow-gold)' : 'none',
   }
 })
 

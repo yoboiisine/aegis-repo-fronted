@@ -20,6 +20,7 @@ export const controlStyle = {
   background: 'var(--surface-input)',
   borderColor: 'var(--border-default)',
   color: 'var(--text-primary)',
+  boxShadow: 'var(--specular-rim-subtle)',
 } as const
 
 export const controlHoverStyle = {
@@ -29,6 +30,12 @@ export const controlHoverStyle = {
 export const focusStyle = {
   borderColor: 'var(--border-focus)',
   boxShadow: 'var(--focus-ring-glow)',
+  background: 'var(--surface-primary)',
+} as const
+
+export const focusGoldStyle = {
+  borderColor: 'var(--gold)',
+  boxShadow: '0 0 0 3px var(--gold-muted), var(--shadow-gold)',
   background: 'var(--surface-primary)',
 } as const
 
