@@ -394,7 +394,7 @@ export const useVaultStore = defineStore('vault', () => {
       credentials.value = [summary, ...credentials.value];
       if (input.kind === 'api-key' || input.kind === 'access-token') {
         apiKeys.value = [summary, ...apiKeys.value];
-      } else {
+      } else if (input.kind === 'password') {
         passwords.value = [summary, ...passwords.value];
       }
       notify({ type: 'success', title: 'Credential created' });
