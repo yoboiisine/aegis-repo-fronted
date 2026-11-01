@@ -54,7 +54,6 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
-let restoreOverflow = ''
 let previouslyFocused: HTMLElement | null = null
 
 watch(
@@ -63,13 +62,16 @@ watch(
     if (open) {
       // Remember the invoking element so focus can be restored on close.
       previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null
-      restoreOverflow = document.body.style.overflow
-      document.body.style.overflow = 'hidden'
+      // Lock background scroll by preventing wheel/touch on document.
+      // We do NOT use `body.overflow = hidden` here because the modal's own
+      // scroll container (overflow-y: auto on the fixed wrapper) must remain
+      // scrollable — locking the body would prevent that.
+      document.documentElement.classList.add('modal-open')
       window.addEventListener('keydown', onKeydown, true)
       await nextTick()
       panelRef.value?.querySelector<HTMLElement>(FOCUSABLE)?.focus()
     } else {
-      document.body.style.overflow = restoreOverflow
+      document.documentElement.classList.remove('modal-open')
       window.removeEventListener('keydown', onKeydown, true)
       // Restore focus to the opener (if still in the document) when closing.
       if (previouslyFocused?.isConnected) previouslyFocused.focus()
@@ -83,7 +85,7 @@ watch(
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown, true)
-  if (props.open) document.body.style.overflow = restoreOverflow
+  if (props.open) document.documentElement.classList.remove('modal-open')
 })
 
 const scrimTransition = { duration: durations.control, ease: easings.inOut }
@@ -97,11 +99,11 @@ const scrimTransition = { duration: durations.control, ease: easings.inOut }
         :initial="{ opacity: 0 }"
         :animate="{ opacity: 1, transition: scrimTransition }"
         :exit="{ opacity: 0, transition: { duration: durations.micro, ease: easings.in } }"
-        class="fixed inset-0 z-[60] flex items-center justify-center p-4"
+        class="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto p-4"
       >
         <!-- Scrim: dim + light blur only; heavy blur is reserved for the panel -->
         <div
-          class="absolute inset-0"
+          class="fixed inset-0"
           :style="{ background: 'var(--surface-overlay)', backdropFilter: 'blur(var(--blur-xs))', WebkitBackdropFilter: 'blur(var(--blur-xs))' }"
           @click="emit('close')"
         />
@@ -114,7 +116,7 @@ const scrimTransition = { duration: durations.control, ease: easings.inOut }
           :initial="{ opacity: 0, scale: 0.95, y: 14 }"
           :animate="{ opacity: 1, scale: 1, y: 0, transition: springs.dialog }"
           :exit="{ opacity: 0, scale: 0.965, y: 8, transition: { duration: durations.micro, ease: easings.in } }"
-          class="a-glass a-glass--modal relative w-full p-6"
+          class="a-glass a-glass--modal relative w-full my-auto p-6"
           :style="{ maxWidth, borderRadius: 'var(--radius-xl)' }"
         >
           <slot />

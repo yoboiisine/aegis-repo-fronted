@@ -202,6 +202,14 @@
 /* ==========================================================================
    Scrollbar / focus / selection
    ========================================================================== */
+
+/* Applied to <html> by ModalShell when a modal is open. Prevents the
+   background page from scrolling while the modal's own scroll container
+   (the fixed wrapper) remains independently scrollable. */
+html.modal-open {
+  overflow: hidden;
+}
+
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
