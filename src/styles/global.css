@@ -120,7 +120,7 @@
   border: 1px solid var(--glass-border);
   backdrop-filter: blur(var(--blur-md)) saturate(1.35);
   -webkit-backdrop-filter: blur(var(--blur-md)) saturate(1.35);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--specular-rim), var(--shadow-md);
 }
 
 /* Top-edge light catch. Pseudo-element keeps the panel's own background
@@ -139,17 +139,20 @@
   background: var(--glass-bg-subtle);
   backdrop-filter: blur(var(--blur-xs)) saturate(1.2);
   -webkit-backdrop-filter: blur(var(--blur-xs)) saturate(1.2);
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--specular-rim-subtle), var(--shadow-xs);
 }
 
-.a-glass--standard { background: var(--glass-bg); }
+.a-glass--standard {
+  background: var(--glass-bg);
+  box-shadow: var(--specular-rim), var(--shadow-sm);
+}
 
 .a-glass--elevated {
   background: var(--glass-bg-elevated);
   backdrop-filter: blur(var(--blur-lg)) saturate(1.4);
   -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(1.4);
   border-color: var(--glass-border-strong);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--specular-rim), var(--shadow-lg);
 }
 
 .a-glass--modal {
@@ -157,18 +160,35 @@
   backdrop-filter: blur(var(--blur-xl)) saturate(1.5);
   -webkit-backdrop-filter: blur(var(--blur-xl)) saturate(1.5);
   border-color: var(--glass-border-strong);
-  box-shadow: var(--shadow-modal);
+  box-shadow: var(--specular-rim), var(--shadow-modal);
 }
 
 .a-glass--focused {
   border-color: var(--accent-border);
-  box-shadow: var(--shadow-lg), var(--shadow-accent);
+  box-shadow: var(--specular-rim), var(--shadow-lg), var(--shadow-accent);
 }
 
 /* Golden variant — reserved for premium highlights (never default chrome). */
 .a-glass--gold {
+  background: var(--gold-surface);
   border-color: var(--gold-border);
-  box-shadow: var(--shadow-md), var(--shadow-gold);
+  box-shadow: var(--specular-rim-gold), var(--shadow-md), var(--shadow-gold);
+}
+
+/* Interactive elevation for cards and actionable surfaces */
+.a-glass--interactive {
+  transition: transform var(--duration-control) var(--ease-out),
+              box-shadow var(--duration-control) var(--ease-out),
+              border-color var(--duration-control) var(--ease-out);
+}
+.a-glass--interactive:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-default);
+  box-shadow: var(--specular-rim), var(--shadow-md);
+}
+.a-glass--interactive.a-glass--gold:hover {
+  border-color: var(--gold);
+  box-shadow: var(--specular-rim-gold), var(--shadow-lg), var(--shadow-gold-elevated);
 }
 
 /* Gold hairline divider/accent rule. */

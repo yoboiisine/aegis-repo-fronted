@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted } from 'vue';
 import { motion, AnimatePresence } from 'motion-v';
 import { AlertTriangle } from 'lucide-vue-next';
 import AppButton from './AppButton.vue';
@@ -9,11 +9,18 @@ interface Props {
   title: string;
   confirmLabel?: string;
   danger?: boolean;
+  confirmVariant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'glass' | 'gold';
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   confirmLabel: 'Confirm',
   danger: false,
+  confirmVariant: undefined,
+});
+
+const resolvedConfirmVariant = computed(() => {
+  if (props.confirmVariant) return props.confirmVariant;
+  return props.danger ? 'danger' : 'gold';
 });
 
 const emit = defineEmits<{
@@ -44,8 +51,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
         :initial="{ opacity: 0, scale: 0.95, y: 10 }"
         :animate="{ opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 420, damping: 30, mass: 0.9 } }"
         :exit="{ opacity: 0, scale: 0.96, y: 8, transition: { duration: 0.16, ease: [0.55, 0, 1, 0.45] } }"
-        class="relative w-full max-w-md rounded-lg border p-6"
-        :style="{ background: 'var(--surface-primary)', borderColor: 'var(--border-default)', boxShadow: 'var(--shadow-xl)' }"
+        class="a-glass a-glass--modal relative w-full max-w-md p-6"
+        :style="{ borderRadius: 'var(--radius-xl)' }"
       >
         <div class="flex items-center gap-2 mb-3">
           <AlertTriangle v-if="danger" :size="16" :style="{ color: 'var(--danger)' }" />
@@ -56,7 +63,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown));
         </div>
         <div class="flex justify-end gap-2">
           <AppButton variant="secondary" @click="emit('cancel')">Cancel</AppButton>
-          <AppButton :variant="danger ? 'danger' : 'primary'" @click="emit('confirm')">{{ confirmLabel }}</AppButton>
+          <AppButton :variant="resolvedConfirmVariant" @click="emit('confirm')">{{ confirmLabel }}</AppButton>
         </div>
       </motion.div>
     </motion.div>

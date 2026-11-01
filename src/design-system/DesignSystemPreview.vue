@@ -18,7 +18,7 @@ import {
 } from 'lucide-vue-next'
 import {
   AppBadge, AppButton, AppDivider, AppIconButton, AppInput, AppPasswordInput,
-  AppSpinner, AppTabs, AppTooltip, DropdownShell, GlassPanel, ModalShell, ThemeToggle,
+  AppSpinner, AppTabs, AppTooltip, Card, DropdownShell, GlassPanel, ModalShell, ThemeToggle,
   type TabItem,
 } from '@/components/ui'
 import { staggers } from '@/motion/tokens'
@@ -132,6 +132,25 @@ function replayStagger() {
           </GlassPanel>
         </div>
 
+        <!-- Elevated Cards Showcase -->
+        <div class="mt-4">
+          <p class="a-label mb-2">Elevated Cards & Tactile Depth</p>
+          <div class="grid sm:grid-cols-3 gap-3">
+            <Card variant="standard" padding="sm">
+              <p class="text-[13px] font-semibold text-[var(--text-primary)]">Standard Glass Card</p>
+              <p class="text-[11px] text-[var(--text-tertiary)] mt-1">Specular top rim and layered elevation.</p>
+            </Card>
+            <Card variant="elevated" padding="sm">
+              <p class="text-[13px] font-semibold text-[var(--text-primary)]">Elevated Modal Card</p>
+              <p class="text-[11px] text-[var(--text-tertiary)] mt-1">Increased depth, backdrop saturation, and shadow.</p>
+            </Card>
+            <Card variant="gold" interactive padding="sm">
+              <p class="text-[13px] font-semibold text-[var(--gold)]">Gold Interactive Card</p>
+              <p class="text-[11px] text-[var(--text-tertiary)] mt-1">Subtle gold tint, hairline border, and hover lift.</p>
+            </Card>
+          </div>
+        </div>
+
         <div class="mt-4">
           <AppTabs v-model="activeTab" :tabs="tabs" />
           <GlassPanel :depth="activeTab === 'motion' ? 'focused' : 'subtle'" class="mt-3" padding="1rem">
@@ -194,6 +213,8 @@ function replayStagger() {
           <AppBadge>Neutral</AppBadge>
           <AppBadge tone="accent"><Globe :size="11" /> Production</AppBadge>
           <AppBadge tone="gold"><Lock :size="11" /> Premium</AppBadge>
+          <AppBadge tone="gold" solid><Lock :size="11" /> Gold Solid</AppBadge>
+          <AppBadge tone="accent" solid>Solid Accent</AppBadge>
           <AppBadge tone="success"><CheckCircle2 :size="11" /> Valid</AppBadge>
           <AppBadge tone="warning"><AlertTriangle :size="11" /> Expires soon</AppBadge>
           <AppBadge tone="danger">Revoked</AppBadge>

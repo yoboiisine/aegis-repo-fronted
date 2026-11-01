@@ -14,6 +14,7 @@ import { useTheme } from '@/composables/useTheme';
 import PageContainer from '@/components/layout/PageContainer.vue';
 import PageHeader from '@/components/layout/PageHeader.vue';
 import Card from '@/components/ui/Card.vue';
+import AppButton from '@/components/ui/AppButton.vue';
 import Section from '@/components/layout/Section.vue';
 import KeyValue from '@/components/ui/KeyValue.vue';
 import { MotionReveal } from '@/motion/components';
@@ -47,11 +48,10 @@ const { theme, toggleTheme } = useTheme();
               <p class="text-[13px] text-[var(--text-secondary)]">Theme</p>
               <p class="text-[11px] text-[var(--text-disabled)] mt-0.5">Switch between light and dark mode</p>
             </div>
-            <motion.button
+            <AppButton
+              variant="secondary"
+              size="sm"
               @click="toggleTheme({ animate: true })"
-              v-bind="buttonInteraction"
-              class="flex items-center gap-2 px-3 py-2 text-[12px] font-medium rounded-md border cursor-pointer"
-              :style="{ background: 'var(--surface-secondary)', borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }"
               :aria-label="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
             >
               <!-- Shared-layout icon: the pill morphs between environments. -->
@@ -67,8 +67,8 @@ const { theme, toggleTheme } = useTheme();
                 <Moon v-if="theme === 'dark'" :size="13" />
                 <Sun v-else :size="13" />
               </motion.span>
-              {{ theme === 'dark' ? 'Dark' : 'Light' }}
-            </motion.button>
+              <span>{{ theme === 'dark' ? 'Dark' : 'Light' }}</span>
+            </AppButton>
           </div>
         </Section>
       </Card>

@@ -134,12 +134,21 @@
   --accent-border: rgba(106, 165, 255, 0.35);
   --accent-glow: rgba(106, 165, 255, 0.22);
 
-  /* Golden highlights */
+  /* Golden highlights & surfaces */
   --gold: var(--a-gold-500);
   --gold-bright: var(--a-gold-300);
   --gold-muted: rgba(217, 179, 106, 0.12);
   --gold-border: rgba(217, 179, 106, 0.34);
-  --gold-glow: rgba(217, 179, 106, 0.16);
+  --gold-border-focus: rgba(236, 211, 162, 0.75);
+  --gold-surface: rgba(217, 179, 106, 0.07);
+  --gold-glow: rgba(217, 179, 106, 0.22);
+  --gradient-gold: linear-gradient(135deg, #e5c382 0%, #d9b36a 50%, #b98f3e 100%);
+  --gradient-gold-hover: linear-gradient(135deg, #ecd3a2 0%, #e5c382 50%, #c49944 100%);
+  --gradient-gold-subtle: linear-gradient(135deg, rgba(217, 179, 106, 0.16) 0%, rgba(217, 179, 106, 0.04) 100%);
+  --text-on-gold: #081026;
+  --specular-rim: inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+  --specular-rim-subtle: inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+  --specular-rim-gold: inset 0 1px 0 0 rgba(255, 245, 215, 0.45);
 
   /* Glass system */
   --glass-bg: rgba(18, 34, 74, 0.55);
@@ -162,6 +171,7 @@
   --shadow-modal: 0 40px 90px -24px hsl(var(--shadow-color) / 0.8), 0 0 0 1px rgba(156, 196, 255, 0.12);
   --shadow-accent: 0 0 24px -6px var(--accent-glow);
   --shadow-gold: 0 0 20px -6px var(--gold-glow);
+  --shadow-gold-elevated: 0 4px 16px -2px rgba(217, 179, 106, 0.32), 0 1px 3px 0 rgba(0, 0, 0, 0.5);
 
   /* Focus ring */
   --focus-ring: 0 0 0 2px var(--surface-base), 0 0 0 4px var(--accent-primary);
@@ -251,12 +261,21 @@
   --accent-border: rgba(47, 116, 214, 0.3);
   --accent-glow: rgba(47, 116, 214, 0.25);
 
-  /* Golden highlights — restrained */
+  /* Golden highlights & surfaces — restrained */
   --gold: var(--a-gold-600);
   --gold-bright: var(--a-gold-400);
   --gold-muted: rgba(185, 143, 62, 0.1);
   --gold-border: rgba(185, 143, 62, 0.32);
+  --gold-border-focus: rgba(185, 143, 62, 0.7);
+  --gold-surface: rgba(185, 143, 62, 0.06);
   --gold-glow: rgba(216, 180, 106, 0.28);
+  --gradient-gold: linear-gradient(135deg, #d8b46a 0%, #c99f48 50%, #b98f3e 100%);
+  --gradient-gold-hover: linear-gradient(135deg, #e2c179 0%, #d8b46a 50%, #a67f33 100%);
+  --gradient-gold-subtle: linear-gradient(135deg, rgba(185, 143, 62, 0.14) 0%, rgba(185, 143, 62, 0.03) 100%);
+  --text-on-gold: #16305e;
+  --specular-rim: inset 0 1px 0 0 rgba(255, 255, 255, 0.85);
+  --specular-rim-subtle: inset 0 1px 0 0 rgba(255, 255, 255, 0.55);
+  --specular-rim-gold: inset 0 1px 0 0 rgba(255, 255, 255, 0.65);
 
   /* Glass system */
   --glass-bg: rgba(255, 255, 255, 0.62);
@@ -279,6 +298,7 @@
   --shadow-modal: 0 36px 80px -24px hsl(var(--shadow-color) / 0.32), 0 0 0 1px rgba(122, 162, 220, 0.25);
   --shadow-accent: 0 0 22px -8px var(--accent-glow);
   --shadow-gold: 0 0 18px -8px var(--gold-glow);
+  --shadow-gold-elevated: 0 4px 14px -2px rgba(185, 143, 62, 0.28), 0 1px 3px 0 rgba(22, 48, 94, 0.14);
 
   /* Focus ring */
   --focus-ring: 0 0 0 2px var(--surface-base), 0 0 0 4px var(--accent-primary);

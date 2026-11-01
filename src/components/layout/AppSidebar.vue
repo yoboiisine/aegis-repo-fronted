@@ -17,6 +17,7 @@ import { useVaultStore } from '@/stores/vaultStore';
 import { useTheme } from '@/composables/useTheme';
 import { navItemInteraction, iconButtonInteraction } from '@/motion/presets';
 import { useAppReducedMotion } from '@/motion/composables/useReducedMotion';
+import AppButton from '@/components/ui/AppButton.vue';
 import type { PageId } from '@/types';
 
 const store = useVaultStore();
@@ -73,13 +74,14 @@ async function handleLock() {
     <div class="px-5 pt-6 pb-5">
       <div class="flex items-center gap-3">
         <div
-          class="w-8 h-8 rounded-md flex items-center justify-center"
+          class="w-8 h-8 rounded-md flex items-center justify-center relative transition-transform duration-200"
           :style="{
-            background: 'var(--accent-muted)',
-            border: '1px solid var(--accent-border)',
+            background: 'var(--gold-surface)',
+            border: '1px solid var(--gold-border)',
+            boxShadow: 'var(--specular-rim-gold), var(--shadow-gold)',
           }"
         >
-          <Shield :size="15" :style="{ color: 'var(--accent-primary)' }" />
+          <Shield :size="15" :style="{ color: 'var(--gold)' }" />
         </div>
         <div>
           <h1
@@ -117,7 +119,8 @@ async function handleLock() {
             :class="{ 'nav-row--active': store.currentPage === item.id }"
             :style="{
               color: store.currentPage === item.id ? 'var(--text-primary)' : 'var(--text-secondary)',
-              background: store.currentPage === item.id ? 'var(--surface-tertiary)' : 'transparent',
+              background: store.currentPage === item.id ? 'var(--gold-surface)' : 'transparent',
+              border: store.currentPage === item.id ? '1px solid var(--gold-border)' : '1px solid transparent',
             }"
           >
             <!-- Single traveling indicator: one layoutId across all rows, so
@@ -126,14 +129,14 @@ async function handleLock() {
               v-if="store.currentPage === item.id"
               layoutId="active-navigation-indicator"
               :transition="{ type: 'spring', stiffness: 480, damping: 34, mass: 0.9 }"
-              class="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 rounded-r"
-              :style="{ background: 'var(--accent-primary)' }"
+              class="absolute left-0 top-1/2 -translate-y-1/2 w-[2.5px] h-4 rounded-r"
+              :style="{ background: 'var(--gold)', boxShadow: '0 0 8px var(--gold-glow)' }"
             />
             <component
               :is="item.icon"
               :size="15"
               :style="{
-                color: store.currentPage === item.id ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+                color: store.currentPage === item.id ? 'var(--gold)' : 'var(--text-tertiary)',
               }"
             />
             {{ item.label }}
@@ -171,19 +174,15 @@ async function handleLock() {
       </div>
 
       <!-- Lock button -->
-      <motion.button
+      <AppButton
+        variant="secondary"
+        size="sm"
+        class="w-full text-[var(--danger)] hover:border-[var(--danger)] hover:bg-[var(--danger-muted)]"
         @click="handleLock"
-        v-bind="reduced ? {} : iconButtonInteraction"
-        class="lock-row w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md text-[12px] font-medium cursor-pointer"
-        :style="{
-          color: 'var(--danger)',
-          background: 'var(--danger-muted)',
-          border: '1px solid transparent',
-        }"
       >
         <Lock :size="12" />
         Lock Vault
-      </motion.button>
+      </AppButton>
     </div>
   </aside>
 </template>
