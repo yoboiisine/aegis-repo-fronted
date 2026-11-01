@@ -1,15 +1,12 @@
 <script setup lang="ts">
 import CredentialList from '@/components/vault/CredentialList.vue';
-import { useVaultStore } from '@/stores/vaultStore';
-
-const store = useVaultStore();
 </script>
 
 <template>
   <CredentialList
-    title="Passwords"
-    subtitle="Secure password storage"
-    :items="store.passwords"
+    title="Passwords & Vault Items"
+    subtitle="Passwords, SSH keys, OAuth2 credentials & secure notes"
+    :allowed-kinds="['password', 'ssh-key', 'oauth2', 'secure-note']"
     default-kind="password"
   />
 </template>

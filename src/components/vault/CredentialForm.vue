@@ -1,16 +1,40 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
-import type { CredentialDetail, CredentialKind, CreateCredentialInput } from '@/types';
+import { ref, computed } from 'vue';
+import {
+  Key,
+  Terminal,
+  Shield,
+  FileText,
+  Globe,
+  Fingerprint,
+} from 'lucide-vue-next';
+import type {
+  CredentialDetail,
+  CredentialKind,
+  CreateCredentialInput,
+  ApiKeyMetadata,
+  OAuth2Metadata,
+  SshKeyMetadata,
+  SecureNoteMetadata,
+} from '@/types';
 import { CREDENTIAL_KINDS, CATEGORIES } from '@/services/api/contracts';
 import AppButton from '@/components/ui/AppButton.vue';
+import {
+  controlBaseClass,
+  controlStyle,
+  focusStyle,
+  errorStyle,
+} from '@/components/ui/formStyles';
 
 interface Props {
-  initial?: CredentialDetail;
+  initial?: CredentialDetail | null;
   defaultKind?: CredentialKind;
+  allowedKinds?: CredentialKind[];
   isEdit?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  initial: null,
   isEdit: false,
 });
 
@@ -19,7 +43,21 @@ const emit = defineEmits<{
   cancel: [];
 }>();
 
-const kind = ref<CredentialKind>(props.initial?.kind ?? props.defaultKind ?? 'password');
+const availableKinds = computed(() => {
+  if (props.allowedKinds && props.allowedKinds.length > 0) {
+    return CREDENTIAL_KINDS.filter(k => props.allowedKinds!.includes(k.value));
+  }
+  return CREDENTIAL_KINDS;
+});
+
+const kind = ref<CredentialKind>(
+  props.initial?.kind ??
+    props.defaultKind ??
+    (props.allowedKinds && props.allowedKinds[0]) ??
+    'password',
+);
+
+// Common fields
 const title = ref(props.initial?.title ?? '');
 const username = ref(props.initial?.username ?? '');
 const secret = ref('');
@@ -27,168 +65,785 @@ const url = ref(props.initial?.url ?? '');
 const category = ref(props.initial?.category ?? '');
 const tagsStr = ref(props.initial?.tags?.join(', ') ?? '');
 const notes = ref(props.initial?.notes ?? '');
+
+// Kind-specific metadata fields
+// API Key & Access Token
+const apiKeyProvider = ref(props.initial?.apiKeyMetadata?.provider ?? props.initial?.metadata?.provider ?? '');
+const apiKeyProject = ref(props.initial?.apiKeyMetadata?.project ?? props.initial?.metadata?.project ?? '');
+const apiKeyEnv = ref<'production' | 'staging' | 'development' | 'test'>(
+  props.initial?.apiKeyMetadata?.environment ?? props.initial?.metadata?.environment ?? 'production',
+);
+const apiKeyExpiresAt = ref(props.initial?.apiKeyMetadata?.expiresAt ?? props.initial?.metadata?.expiresAt ?? '');
+const apiKeyScopes = ref(props.initial?.apiKeyMetadata?.scopes?.join(', ') ?? props.initial?.metadata?.scopes?.join(', ') ?? '');
+
+// SSH Key
+const sshKeyType = ref<'ed25519' | 'rsa' | 'ecdsa'>(props.initial?.sshKeyMetadata?.keyType ?? 'ed25519');
+const sshPassphraseProtected = ref<boolean>(props.initial?.sshKeyMetadata?.passphraseProtected ?? true);
+const sshPublicKey = ref(props.initial?.sshKeyMetadata?.publicKey ?? '');
+const sshFingerprint = ref(props.initial?.sshKeyMetadata?.fingerprint ?? '');
+
+// OAuth2
+const oauthClientId = ref(props.initial?.oauth2Metadata?.clientId ?? '');
+const oauthTokenUrl = ref(props.initial?.oauth2Metadata?.tokenUrl ?? '');
+const oauthAuthUrl = ref(props.initial?.oauth2Metadata?.authUrl ?? '');
+const oauthGrantType = ref<'authorization_code' | 'client_credentials' | 'refresh_token' | 'implicit'>(
+  props.initial?.oauth2Metadata?.grantType ?? 'client_credentials',
+);
+const oauthScopes = ref(props.initial?.oauth2Metadata?.scopes?.join(', ') ?? '');
+const oauthExpiresAt = ref(props.initial?.oauth2Metadata?.expiresAt ?? '');
+
+// Secure Note
+const noteFormat = ref<'plain' | 'markdown'>(props.initial?.secureNoteMetadata?.format ?? 'markdown');
+const noteIsSensitive = ref<boolean>(props.initial?.secureNoteMetadata?.isSensitive ?? true);
+
 const errors = ref<Record<string, string>>({});
+const focusedField = ref<string | null>(null);
+
+function getKindIcon(k: CredentialKind) {
+  switch (k) {
+    case 'password':
+      return Key;
+    case 'api-key':
+      return Fingerprint;
+    case 'access-token':
+      return Shield;
+    case 'ssh-key':
+      return Terminal;
+    case 'oauth2':
+      return Globe;
+    case 'secure-note':
+      return FileText;
+  }
+}
 
 function validate(): boolean {
   const errs: Record<string, string> = {};
-  if (!title.value.trim()) errs.title = 'Title is required';
-  if (!secret.value.trim() && !props.isEdit) errs.secret = 'Secret is required';
-  if (title.value.length > 128) errs.title = 'Title must be 128 characters or less';
+  if (!title.value.trim()) {
+    errs.title = 'Title is required';
+  } else if (title.value.length > 128) {
+    errs.title = 'Title must be 128 characters or less';
+  }
+
+  if (!secret.value.trim() && !props.isEdit) {
+    if (kind.value === 'secure-note') {
+      errs.secret = 'Note content is required';
+    } else {
+      errs.secret = 'Secret is required';
+    }
+  }
+
+  if (kind.value === 'oauth2' && !oauthClientId.value.trim()) {
+    errs.oauthClientId = 'Client ID is required';
+  }
+
   errors.value = errs;
   return Object.keys(errs).length === 0;
 }
 
 function handleSubmit() {
   if (!validate()) return;
-  const tags = tagsStr.value.split(',').map(t => t.trim()).filter(Boolean);
-  emit('submit', {
+
+  const tags = tagsStr.value
+    .split(',')
+    .map(t => t.trim())
+    .filter(Boolean);
+
+  const finalSecret = secret.value.trim() || (props.initial?.secret ?? '');
+
+  const payload: CreateCredentialInput = {
     kind: kind.value,
     title: title.value.trim(),
     username: username.value.trim() || undefined,
-    secret: secret.value.trim() || (props.initial?.secret ?? ''),
+    secret: finalSecret,
     url: url.value.trim() || undefined,
     category: category.value.trim() || undefined,
     tags: tags.length > 0 ? tags : undefined,
-    notes: notes.value.trim() || undefined,
-  });
+    notes: notes.value.trim() || (kind.value === 'secure-note' ? finalSecret : undefined),
+  };
+
+  // Build type-specific metadata
+  if (kind.value === 'api-key' || kind.value === 'access-token') {
+    const scopesArr = apiKeyScopes.value
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    const apiMeta: ApiKeyMetadata = {
+      provider: apiKeyProvider.value.trim() || undefined,
+      project: apiKeyProject.value.trim() || undefined,
+      environment: apiKeyEnv.value,
+      expiresAt: apiKeyExpiresAt.value.trim() || undefined,
+      scopes: scopesArr.length > 0 ? scopesArr : undefined,
+    };
+    payload.apiKeyMetadata = apiMeta;
+    payload.metadata = apiMeta; // backwards compatibility
+  } else if (kind.value === 'ssh-key') {
+    const sshMeta: SshKeyMetadata = {
+      keyType: sshKeyType.value,
+      passphraseProtected: sshPassphraseProtected.value,
+      publicKey: sshPublicKey.value.trim() || undefined,
+      fingerprint: sshFingerprint.value.trim() || undefined,
+    };
+    payload.sshKeyMetadata = sshMeta;
+  } else if (kind.value === 'oauth2') {
+    const scopesArr = oauthScopes.value
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    const oauthMeta: OAuth2Metadata = {
+      clientId: oauthClientId.value.trim(),
+      tokenUrl: oauthTokenUrl.value.trim() || undefined,
+      authUrl: oauthAuthUrl.value.trim() || undefined,
+      grantType: oauthGrantType.value,
+      scopes: scopesArr.length > 0 ? scopesArr : undefined,
+      expiresAt: oauthExpiresAt.value.trim() || undefined,
+    };
+    payload.oauth2Metadata = oauthMeta;
+  } else if (kind.value === 'secure-note') {
+    const noteMeta: SecureNoteMetadata = {
+      format: noteFormat.value,
+      isSensitive: noteIsSensitive.value,
+      characterCount: finalSecret.length,
+    };
+    payload.secureNoteMetadata = noteMeta;
+  }
+
+  emit('submit', payload);
+}
+
+function inputStyle(fieldName: string) {
+  const isFocused = focusedField.value === fieldName;
+  const hasError = Boolean(errors.value[fieldName]);
+  return {
+    ...controlStyle,
+    ...(isFocused && !hasError ? focusStyle : {}),
+    ...(hasError ? errorStyle : {}),
+  };
 }
 </script>
 
 <template>
   <form @submit.prevent="handleSubmit" class="space-y-4">
-    <!-- Kind selector (only for create) -->
-    <div v-if="!isEdit">
-      <label class="text-[10px] font-medium tracking-wider uppercase mb-1.5 block" style="color: var(--text-tertiary)">Type</label>
-      <div class="grid grid-cols-2 gap-1.5">
+    <!-- Kind selector (only when creating) -->
+    <div v-if="!isEdit && availableKinds.length > 1">
+      <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+        Credential Type
+      </label>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
         <button
-          v-for="k in CREDENTIAL_KINDS"
+          v-for="k in availableKinds"
           :key="k.value"
           type="button"
           @click="kind = k.value"
-          class="px-2.5 py-2 text-[11px] font-medium rounded-md border transition-colors"
+          class="flex items-center gap-2 px-3 py-2 text-[12px] font-medium rounded-md border transition-all text-left"
           :style="{
-            background: kind === k.value ? 'var(--accent-muted)' : 'var(--surface-secondary)',
-            borderColor: kind === k.value ? 'var(--accent-border)' : 'var(--border-subtle)',
-            color: kind === k.value ? 'var(--accent-primary)' : 'var(--text-secondary)',
+            background: kind === k.value ? 'var(--gold-surface)' : 'var(--surface-input)',
+            borderColor: kind === k.value ? 'var(--gold-border)' : 'var(--border-subtle)',
+            color: kind === k.value ? 'var(--gold)' : 'var(--text-secondary)',
+            boxShadow: kind === k.value ? 'var(--shadow-gold), var(--specular-rim-gold)' : 'none',
           }"
         >
-          {{ k.label }}
+          <component :is="getKindIcon(k.value)" :size="13" class="shrink-0" />
+          <span class="truncate">{{ k.label }}</span>
         </button>
       </div>
     </div>
 
     <!-- Title -->
     <div>
-      <label class="text-[10px] font-medium tracking-wider uppercase mb-1.5 block" style="color: var(--text-tertiary)">Title *</label>
+      <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+        Title *
+      </label>
       <input
         v-model="title"
         type="text"
-        placeholder="e.g., GitHub Enterprise"
-        class="w-full px-3 py-2 text-[13px] rounded-md border transition-colors"
-        :style="{
-          background: 'var(--surface-secondary)',
-          borderColor: errors.title ? 'var(--danger)' : 'var(--border-subtle)',
-          color: 'var(--text-primary)',
-        }"
-        @focus="($event.target as HTMLInputElement).style.borderColor = 'var(--border-focus)'"
-        @blur="($event.target as HTMLInputElement).style.borderColor = errors.title ? 'var(--danger)' : 'var(--border-subtle)'"
+        :placeholder="
+          kind === 'password'
+            ? 'e.g. GitHub Enterprise'
+            : kind === 'api-key'
+            ? 'e.g. Stripe Production'
+            : kind === 'ssh-key'
+            ? 'e.g. Production Bastion Host'
+            : kind === 'oauth2'
+            ? 'e.g. Google Cloud App Client'
+            : kind === 'secure-note'
+            ? 'e.g. Disaster Recovery Runbook'
+            : 'e.g. AWS IAM Deployment Role'
+        "
+        :class="controlBaseClass"
+        class="px-3 py-2 text-[13px]"
+        :style="inputStyle('title')"
+        @focus="focusedField = 'title'"
+        @blur="focusedField = null"
         autofocus
       />
-      <p v-if="errors.title" class="text-[10px] mt-1" style="color: var(--danger)">{{ errors.title }}</p>
+      <p v-if="errors.title" class="text-[11px] mt-1 text-[var(--danger)]">{{ errors.title }}</p>
     </div>
 
-    <!-- Username -->
-    <div>
-      <label class="text-[10px] font-medium tracking-wider uppercase mb-1.5 block" style="color: var(--text-tertiary)">
-        {{ kind === 'password' ? 'Username' : 'Identifier' }}
-      </label>
-      <input
-        v-model="username"
-        type="text"
-        :placeholder="kind === 'password' ? 'user@example.com' : 'Optional'"
-        class="w-full px-3 py-2 text-[13px] rounded-md border transition-colors"
-        :style="{ background: 'var(--surface-secondary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }"
-        @focus="($event.target as HTMLInputElement).style.borderColor = 'var(--border-focus)'"
-        @blur="($event.target as HTMLInputElement).style.borderColor = 'var(--border-subtle)'"
-      />
-    </div>
-
-    <!-- Secret -->
-    <div>
-      <label class="text-[10px] font-medium tracking-wider uppercase mb-1.5 block" style="color: var(--text-tertiary)">
-        {{ kind === 'password' ? 'Password' : 'Secret' }} *
-      </label>
-      <textarea
-        v-model="secret"
-        :placeholder="isEdit ? '(leave empty to keep current)' : 'Enter secret'"
-        rows="2"
-        class="w-full px-3 py-2 text-[13px] font-mono rounded-md border transition-colors resize-none"
-        :style="{
-          background: 'var(--surface-secondary)',
-          borderColor: errors.secret ? 'var(--danger)' : 'var(--border-subtle)',
-          color: 'var(--text-primary)',
-        }"
-        @focus="($event.target as HTMLTextAreaElement).style.borderColor = 'var(--border-focus)'"
-        @blur="($event.target as HTMLTextAreaElement).style.borderColor = errors.secret ? 'var(--danger)' : 'var(--border-subtle)'"
-      />
-      <p v-if="errors.secret" class="text-[10px] mt-1" style="color: var(--danger)">{{ errors.secret }}</p>
-    </div>
-
-    <!-- URL -->
-    <div>
-      <label class="text-[10px] font-medium tracking-wider uppercase mb-1.5 block" style="color: var(--text-tertiary)">URL</label>
-      <input
-        v-model="url"
-        type="url"
-        placeholder="https://..."
-        class="w-full px-3 py-2 text-[13px] rounded-md border transition-colors"
-        :style="{ background: 'var(--surface-secondary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }"
-        @focus="($event.target as HTMLInputElement).style.borderColor = 'var(--border-focus)'"
-        @blur="($event.target as HTMLInputElement).style.borderColor = 'var(--border-subtle)'"
-      />
-    </div>
-
-    <!-- Category + Tags -->
-    <div class="grid grid-cols-2 gap-3">
+    <!-- Kind-Specific Dynamic Fields -->
+    <!-- 1. Password -->
+    <template v-if="kind === 'password'">
       <div>
-        <label class="text-[10px] font-medium tracking-wider uppercase mb-1.5 block" style="color: var(--text-tertiary)">Category</label>
+        <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+          Username / Email
+        </label>
+        <input
+          v-model="username"
+          type="text"
+          placeholder="admin@aegis.local"
+          :class="controlBaseClass"
+          class="px-3 py-2 text-[13px]"
+          :style="inputStyle('username')"
+          @focus="focusedField = 'username'"
+          @blur="focusedField = null"
+        />
+      </div>
+
+      <div>
+        <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+          Password *
+        </label>
+        <input
+          v-model="secret"
+          type="password"
+          :placeholder="isEdit ? '(leave blank to keep current)' : 'Enter secure password'"
+          :class="controlBaseClass"
+          class="px-3 py-2 text-[13px] font-mono"
+          :style="inputStyle('secret')"
+          @focus="focusedField = 'secret'"
+          @blur="focusedField = null"
+        />
+        <p v-if="errors.secret" class="text-[11px] mt-1 text-[var(--danger)]">{{ errors.secret }}</p>
+      </div>
+
+      <div>
+        <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+          Website / Login URL
+        </label>
+        <input
+          v-model="url"
+          type="url"
+          placeholder="https://..."
+          :class="controlBaseClass"
+          class="px-3 py-2 text-[13px]"
+          :style="inputStyle('url')"
+          @focus="focusedField = 'url'"
+          @blur="focusedField = null"
+        />
+      </div>
+    </template>
+
+    <!-- 2. API Key -->
+    <template v-else-if="kind === 'api-key'">
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+            Provider
+          </label>
+          <input
+            v-model="apiKeyProvider"
+            type="text"
+            placeholder="e.g. Stripe, OpenAI"
+            :class="controlBaseClass"
+            class="px-3 py-2 text-[13px]"
+            :style="inputStyle('apiKeyProvider')"
+            @focus="focusedField = 'apiKeyProvider'"
+            @blur="focusedField = null"
+          />
+        </div>
+        <div>
+          <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+            Environment
+          </label>
+          <select
+            v-model="apiKeyEnv"
+            :class="controlBaseClass"
+            class="px-2.5 py-2 text-[12px]"
+            :style="inputStyle('apiKeyEnv')"
+          >
+            <option value="production">Production</option>
+            <option value="staging">Staging</option>
+            <option value="development">Development</option>
+            <option value="test">Test</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+          API Key Secret *
+        </label>
+        <textarea
+          v-model="secret"
+          :placeholder="isEdit ? '(leave blank to keep current)' : 'sk_live_...'"
+          rows="2"
+          :class="controlBaseClass"
+          class="px-3 py-2 text-[13px] font-mono resize-none"
+          :style="inputStyle('secret')"
+          @focus="focusedField = 'secret'"
+          @blur="focusedField = null"
+        />
+        <p v-if="errors.secret" class="text-[11px] mt-1 text-[var(--danger)]">{{ errors.secret }}</p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+            Project / Application
+          </label>
+          <input
+            v-model="apiKeyProject"
+            type="text"
+            placeholder="aegis-prod"
+            :class="controlBaseClass"
+            class="px-3 py-2 text-[13px]"
+            :style="inputStyle('apiKeyProject')"
+            @focus="focusedField = 'apiKeyProject'"
+            @blur="focusedField = null"
+          />
+        </div>
+        <div>
+          <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+            Expires At
+          </label>
+          <input
+            v-model="apiKeyExpiresAt"
+            type="date"
+            :class="controlBaseClass"
+            class="px-3 py-2 text-[12px]"
+            :style="inputStyle('apiKeyExpiresAt')"
+            @focus="focusedField = 'apiKeyExpiresAt'"
+            @blur="focusedField = null"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+          Scopes (comma-separated)
+        </label>
+        <input
+          v-model="apiKeyScopes"
+          type="text"
+          placeholder="charges.create, customers.read"
+          :class="controlBaseClass"
+          class="px-3 py-2 text-[12px]"
+          :style="inputStyle('apiKeyScopes')"
+          @focus="focusedField = 'apiKeyScopes'"
+          @blur="focusedField = null"
+        />
+      </div>
+
+      <div>
+        <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+          API Endpoint URL
+        </label>
+        <input
+          v-model="url"
+          type="url"
+          placeholder="https://api.stripe.com"
+          :class="controlBaseClass"
+          class="px-3 py-2 text-[13px]"
+          :style="inputStyle('url')"
+          @focus="focusedField = 'url'"
+          @blur="focusedField = null"
+        />
+      </div>
+    </template>
+
+    <!-- 3. Access Token -->
+    <template v-else-if="kind === 'access-token'">
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+            Token Identifier / Role
+          </label>
+          <input
+            v-model="username"
+            type="text"
+            placeholder="arn:aws:iam::role/deploy"
+            :class="controlBaseClass"
+            class="px-3 py-2 text-[13px]"
+            :style="inputStyle('username')"
+            @focus="focusedField = 'username'"
+            @blur="focusedField = null"
+          />
+        </div>
+        <div>
+          <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+            Provider
+          </label>
+          <input
+            v-model="apiKeyProvider"
+            type="text"
+            placeholder="e.g. AWS, Cloudflare"
+            :class="controlBaseClass"
+            class="px-3 py-2 text-[13px]"
+            :style="inputStyle('apiKeyProvider')"
+            @focus="focusedField = 'apiKeyProvider'"
+            @blur="focusedField = null"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+          Access Token *
+        </label>
+        <textarea
+          v-model="secret"
+          :placeholder="isEdit ? '(leave blank to keep current)' : 'ghp_... or eyJ...'"
+          rows="2"
+          :class="controlBaseClass"
+          class="px-3 py-2 text-[13px] font-mono resize-none"
+          :style="inputStyle('secret')"
+          @focus="focusedField = 'secret'"
+          @blur="focusedField = null"
+        />
+        <p v-if="errors.secret" class="text-[11px] mt-1 text-[var(--danger)]">{{ errors.secret }}</p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+            Environment
+          </label>
+          <select
+            v-model="apiKeyEnv"
+            :class="controlBaseClass"
+            class="px-2.5 py-2 text-[12px]"
+            :style="inputStyle('apiKeyEnv')"
+          >
+            <option value="production">Production</option>
+            <option value="staging">Staging</option>
+            <option value="development">Development</option>
+            <option value="test">Test</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+            Expires At
+          </label>
+          <input
+            v-model="apiKeyExpiresAt"
+            type="date"
+            :class="controlBaseClass"
+            class="px-3 py-2 text-[12px]"
+            :style="inputStyle('apiKeyExpiresAt')"
+            @focus="focusedField = 'apiKeyExpiresAt'"
+            @blur="focusedField = null"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+          Console / Management URL
+        </label>
+        <input
+          v-model="url"
+          type="url"
+          placeholder="https://console.aws.amazon.com"
+          :class="controlBaseClass"
+          class="px-3 py-2 text-[13px]"
+          :style="inputStyle('url')"
+          @focus="focusedField = 'url'"
+          @blur="focusedField = null"
+        />
+      </div>
+    </template>
+
+    <!-- 4. SSH Key -->
+    <template v-else-if="kind === 'ssh-key'">
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+            User / Host
+          </label>
+          <input
+            v-model="username"
+            type="text"
+            placeholder="deploy@bastion.internal"
+            :class="controlBaseClass"
+            class="px-3 py-2 text-[13px]"
+            :style="inputStyle('username')"
+            @focus="focusedField = 'username'"
+            @blur="focusedField = null"
+          />
+        </div>
+        <div>
+          <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+            Key Algorithm
+          </label>
+          <select
+            v-model="sshKeyType"
+            :class="controlBaseClass"
+            class="px-2.5 py-2 text-[12px]"
+            :style="inputStyle('sshKeyType')"
+          >
+            <option value="ed25519">ED25519 (Recommended)</option>
+            <option value="rsa">RSA 4096-bit</option>
+            <option value="ecdsa">ECDSA</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+          Private Key *
+        </label>
+        <textarea
+          v-model="secret"
+          :placeholder="isEdit ? '(leave blank to keep current)' : '-----BEGIN OPENSSH PRIVATE KEY-----\n...'"
+          rows="3"
+          :class="controlBaseClass"
+          class="px-3 py-2 text-[12px] font-mono resize-none"
+          :style="inputStyle('secret')"
+          @focus="focusedField = 'secret'"
+          @blur="focusedField = null"
+        />
+        <p v-if="errors.secret" class="text-[11px] mt-1 text-[var(--danger)]">{{ errors.secret }}</p>
+      </div>
+
+      <div>
+        <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+          Public Key (optional)
+        </label>
+        <textarea
+          v-model="sshPublicKey"
+          placeholder="ssh-ed25519 AAAAC3... user@host"
+          rows="2"
+          :class="controlBaseClass"
+          class="px-3 py-2 text-[12px] font-mono resize-none"
+          :style="inputStyle('sshPublicKey')"
+          @focus="focusedField = 'sshPublicKey'"
+          @blur="focusedField = null"
+        />
+      </div>
+
+      <div class="flex items-center gap-2 pt-1">
+        <input
+          id="ssh-passphrase-protected"
+          v-model="sshPassphraseProtected"
+          type="checkbox"
+          class="rounded border-[var(--border-default)] accent-[var(--gold)]"
+        />
+        <label for="ssh-passphrase-protected" class="text-[12px] text-[var(--text-secondary)] select-none">
+          Key is passphrase protected
+        </label>
+      </div>
+    </template>
+
+    <!-- 5. OAuth2 Client -->
+    <template v-else-if="kind === 'oauth2'">
+      <div>
+        <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+          Client ID *
+        </label>
+        <input
+          v-model="oauthClientId"
+          type="text"
+          placeholder="client_id_..."
+          :class="controlBaseClass"
+          class="px-3 py-2 text-[13px] font-mono"
+          :style="inputStyle('oauthClientId')"
+          @focus="focusedField = 'oauthClientId'"
+          @blur="focusedField = null"
+        />
+        <p v-if="errors.oauthClientId" class="text-[11px] mt-1 text-[var(--danger)]">{{ errors.oauthClientId }}</p>
+      </div>
+
+      <div>
+        <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+          Client Secret *
+        </label>
+        <input
+          v-model="secret"
+          type="password"
+          :placeholder="isEdit ? '(leave blank to keep current)' : 'Enter client secret'"
+          :class="controlBaseClass"
+          class="px-3 py-2 text-[13px] font-mono"
+          :style="inputStyle('secret')"
+          @focus="focusedField = 'secret'"
+          @blur="focusedField = null"
+        />
+        <p v-if="errors.secret" class="text-[11px] mt-1 text-[var(--danger)]">{{ errors.secret }}</p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+            Grant Type
+          </label>
+          <select
+            v-model="oauthGrantType"
+            :class="controlBaseClass"
+            class="px-2.5 py-2 text-[12px]"
+            :style="inputStyle('oauthGrantType')"
+          >
+            <option value="client_credentials">Client Credentials</option>
+            <option value="authorization_code">Authorization Code</option>
+            <option value="refresh_token">Refresh Token</option>
+            <option value="implicit">Implicit</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+            Token Endpoint URL
+          </label>
+          <input
+            v-model="oauthTokenUrl"
+            type="url"
+            placeholder="https://oauth2.../token"
+            :class="controlBaseClass"
+            class="px-3 py-2 text-[12px]"
+            :style="inputStyle('oauthTokenUrl')"
+            @focus="focusedField = 'oauthTokenUrl'"
+            @blur="focusedField = null"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+          Authorization Endpoint URL (optional)
+        </label>
+        <input
+          v-model="oauthAuthUrl"
+          type="url"
+          placeholder="https://.../authorize"
+          :class="controlBaseClass"
+          class="px-3 py-2 text-[12px]"
+          :style="inputStyle('oauthAuthUrl')"
+          @focus="focusedField = 'oauthAuthUrl'"
+          @blur="focusedField = null"
+        />
+      </div>
+
+      <div>
+        <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+          Scopes (comma-separated)
+        </label>
+        <input
+          v-model="oauthScopes"
+          type="text"
+          placeholder="openid, profile, read:data"
+          :class="controlBaseClass"
+          class="px-3 py-2 text-[12px]"
+          :style="inputStyle('oauthScopes')"
+          @focus="focusedField = 'oauthScopes'"
+          @blur="focusedField = null"
+        />
+      </div>
+    </template>
+
+    <!-- 6. Secure Note -->
+    <template v-else-if="kind === 'secure-note'">
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+            Note Format
+          </label>
+          <select
+            v-model="noteFormat"
+            :class="controlBaseClass"
+            class="px-2.5 py-2 text-[12px]"
+            :style="inputStyle('noteFormat')"
+          >
+            <option value="markdown">Markdown</option>
+            <option value="plain">Plain Text</option>
+          </select>
+        </div>
+        <div class="flex items-center gap-2 pt-4">
+          <input
+            id="note-sensitive"
+            v-model="noteIsSensitive"
+            type="checkbox"
+            class="rounded border-[var(--border-default)] accent-[var(--gold)]"
+          />
+          <label for="note-sensitive" class="text-[12px] text-[var(--text-secondary)] select-none">
+            High sensitivity (audit logged)
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+          Secure Content *
+        </label>
+        <textarea
+          v-model="secret"
+          :placeholder="isEdit ? '(leave blank to keep current)' : 'Write your encrypted notes here...'"
+          rows="5"
+          :class="controlBaseClass"
+          class="px-3 py-2 text-[13px] font-mono resize-y"
+          :style="inputStyle('secret')"
+          @focus="focusedField = 'secret'"
+          @blur="focusedField = null"
+        />
+        <p v-if="errors.secret" class="text-[11px] mt-1 text-[var(--danger)]">{{ errors.secret }}</p>
+      </div>
+    </template>
+
+    <!-- Common Metadata: Category & Tags -->
+    <div class="grid grid-cols-2 gap-3 pt-1">
+      <div>
+        <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+          Category
+        </label>
         <select
           v-model="category"
-          class="w-full px-2.5 py-2 text-[12px] rounded-md border"
-          :style="{ background: 'var(--surface-secondary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }"
+          :class="controlBaseClass"
+          class="px-2.5 py-2 text-[12px]"
+          :style="inputStyle('category')"
         >
-          <option value="">None</option>
+          <option value="">Uncategorized</option>
           <option v-for="c in CATEGORIES.filter(c => c !== 'All')" :key="c" :value="c">{{ c }}</option>
         </select>
       </div>
       <div>
-        <label class="text-[10px] font-medium tracking-wider uppercase mb-1.5 block" style="color: var(--text-tertiary)">Tags</label>
+        <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+          Tags (comma-separated)
+        </label>
         <input
           v-model="tagsStr"
           type="text"
-          placeholder="tag1, tag2"
-          class="w-full px-3 py-2 text-[12px] rounded-md border"
-          :style="{ background: 'var(--surface-secondary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }"
+          placeholder="production, backup"
+          :class="controlBaseClass"
+          class="px-3 py-2 text-[12px]"
+          :style="inputStyle('tagsStr')"
+          @focus="focusedField = 'tagsStr'"
+          @blur="focusedField = null"
         />
       </div>
     </div>
 
-    <!-- Notes -->
-    <div>
-      <label class="text-[10px] font-medium tracking-wider uppercase mb-1.5 block" style="color: var(--text-tertiary)">Notes</label>
+    <!-- Notes (for all except secure-note, where note content is the secret) -->
+    <div v-if="kind !== 'secure-note'">
+      <label class="text-[10px] font-semibold tracking-wider uppercase mb-1.5 block text-[var(--text-tertiary)]">
+        Context / Operational Notes
+      </label>
       <textarea
         v-model="notes"
-        placeholder="Additional context..."
+        placeholder="Additional deployment details or rotation instructions..."
         rows="2"
-        class="w-full px-3 py-2 text-[12px] rounded-md border resize-none"
-        :style="{ background: 'var(--surface-secondary)', borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }"
+        :class="controlBaseClass"
+        class="px-3 py-2 text-[12px] resize-none"
+        :style="inputStyle('notes')"
+        @focus="focusedField = 'notes'"
+        @blur="focusedField = null"
       />
     </div>
 
-    <!-- Actions -->
-    <div class="flex justify-end gap-2 pt-2">
-      <AppButton variant="secondary" @click="emit('cancel')">Cancel</AppButton>
-      <AppButton variant="primary" type="submit">{{ isEdit ? 'Update' : 'Create' }}</AppButton>
+    <!-- Action Buttons -->
+    <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-[var(--border-subtle)]">
+      <AppButton variant="secondary" size="sm" type="button" @click="emit('cancel')">
+        Cancel
+      </AppButton>
+      <AppButton variant="gold" size="sm" type="submit">
+        {{ isEdit ? 'Save Changes' : 'Create Credential' }}
+      </AppButton>
     </div>
   </form>
 </template>
