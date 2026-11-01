@@ -1,6 +1,7 @@
 // Service contracts — typed interface for vault operations
 
 import type {
+  CredentialKind,
   CredentialSummary,
   CredentialDetail,
   CreateCredentialInput,
@@ -34,9 +35,11 @@ export interface VaultClient {
    */
   recoverVault?(recoveryKey: string): Promise<RecoverVaultResult>;
   lockVault(): Promise<void>;
-  listCredentials(): Promise<CredentialSummary[]>;
+  listCredentials(filter?: { kind?: CredentialKind; category?: string }): Promise<CredentialSummary[]>;
   listPasswords(): Promise<CredentialSummary[]>;
   listApiKeys(): Promise<CredentialSummary[]>;
+  listOAuth2Credentials?(): Promise<CredentialSummary[]>;
+  listSecureNotes?(): Promise<CredentialSummary[]>;
   getCredential(id: string): Promise<CredentialDetail>;
   createCredential(input: CreateCredentialInput): Promise<CredentialSummary>;
   updateCredential(id: string, input: UpdateCredentialInput): Promise<CredentialSummary>;
@@ -45,11 +48,23 @@ export interface VaultClient {
   isUnlocked(): boolean;
 }
 
-export const CREDENTIAL_KINDS: { value: 'password' | 'api-key' | 'access-token' | 'ssh-key'; label: string }[] = [
+export const CREDENTIAL_KINDS: { value: CredentialKind; label: string }[] = [
   { value: 'password', label: 'Password' },
   { value: 'api-key', label: 'API Key' },
   { value: 'access-token', label: 'Access Token' },
   { value: 'ssh-key', label: 'SSH Key' },
+  { value: 'oauth2', label: 'OAuth2' },
+  { value: 'secure-note', label: 'Secure Note' },
 ];
 
-export const CATEGORIES = ['All', 'Development', 'Infrastructure', 'Payments', 'Communications', 'Operations', 'AI Services'];
+export const CATEGORIES = [
+  'All',
+  'Development',
+  'Infrastructure',
+  'Payments',
+  'Communications',
+  'Operations',
+  'AI Services',
+  'Security',
+  'Personal',
+];
