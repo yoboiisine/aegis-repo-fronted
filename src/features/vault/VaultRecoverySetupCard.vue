@@ -9,7 +9,7 @@
  * - Prominent warning callout requiring offline backup
  * - Explicit confirmation checkbox required before completing setup
  * - Zero persistence in browser storage (localStorage, sessionStorage, URL)
- * - Immediate in-memory clearing upon completion or exit
+ * - Memory hygiene: cleared from reactive component state upon completion or exit
  */
 import { ref, computed, onBeforeUnmount } from 'vue';
 import { motion } from 'motion-v';

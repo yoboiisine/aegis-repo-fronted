@@ -46,13 +46,13 @@ async function handleSubmit() {
 
   const result = await store.setupVault(passphrase.value, confirmPassphrase.value);
   if (result.success) {
-    // Zero out memory immediately upon successful setup
+    // Memory hygiene: clear input fields from reactive state upon successful setup
     passphrase.value = '';
     confirmPassphrase.value = '';
   }
 }
 
-// Memory hygiene: wipe passphrases when component is unmounted
+// Memory hygiene: clear reactive values when component is unmounted
 onBeforeUnmount(() => {
   passphrase.value = '';
   confirmPassphrase.value = '';
@@ -71,7 +71,7 @@ onBeforeUnmount(() => {
         </h2>
       </div>
       <p class="a-supporting" :style="{ color: 'var(--text-tertiary)' }">
-        Your master passphrase encrypts all credentials in the vault. It is never transmitted in plaintext and cannot be reset without a recovery key.
+        Your master passphrase is submitted directly to the local backend service for key derivation and vault verification. It cannot be reset without an emergency recovery key.
       </p>
     </div>
 
@@ -152,7 +152,7 @@ onBeforeUnmount(() => {
       :style="{ borderColor: 'var(--border-subtle)', color: 'var(--text-disabled)' }"
     >
       <ShieldCheck :size="13" class="shrink-0" :style="{ color: 'var(--accent-primary)' }" />
-      <span>Zero-knowledge client architecture. Keys are derived locally.</span>
+      <span>Local backend boundary: KDF, key unwrapping, and cryptographic sessions remain in the backend service.</span>
     </div>
   </div>
 </template>

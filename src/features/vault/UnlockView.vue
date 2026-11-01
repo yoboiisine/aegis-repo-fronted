@@ -2,20 +2,26 @@
 /**
  * UnlockView.vue — Vault lifecycle and authentication orchestrator.
  *
- * Manages:
- * 1. First-run vault setup (passphrase creation & validation)
- * 2. Recovery-key presentation & confirmation (only when supplied by backend)
- * 3. Master passphrase vault unlocking
- * 4. Recovery key entry and recovery states
- * 5. Mock state switching for test verification
+ * Responsibilities:
+ * 1. Explicit initialization loading gate (prevents setup before status is resolved)
+ * 2. Service connection error handling with retry
+ * 3. First-run vault setup (passphrase creation & validation)
+ * 4. Recovery-key presentation & confirmation (only when supplied by backend)
+ * 5. Master passphrase vault unlocking
+ * 6. Recovery key entry and recovery states
+ * 7. Lock failure handling & reconciliation
+ * 8. Development testing mock switcher
  */
 import { ref, computed } from 'vue';
 import { motion, AnimatePresence } from 'motion-v';
-import { Shield, Sparkles, RefreshCw } from 'lucide-vue-next';
+import { Shield, Sparkles, RefreshCw, AlertTriangle, Loader2 } from 'lucide-vue-next';
 import { useVaultStore } from '@/stores/vaultStore';
 import { useAppReducedMotion } from '@/motion/composables/useReducedMotion';
 import { emblemPulse } from '@/motion/presets';
 import GlassPanel from '@/components/ui/GlassPanel.vue';
+import AppButton from '@/components/ui/AppButton.vue';
+import AppSpinner from '@/components/ui/AppSpinner.vue';
+import { setMockVaultState } from '@/services/mock/mockVaultClient';
 
 // Cards
 import VaultSetupCard from './VaultSetupCard.vue';
@@ -29,6 +35,8 @@ const { reduced } = useAppReducedMotion();
 const isRecoveryMode = ref(false);
 
 const activeStep = computed(() => {
+  if (store.isInitializing) return 'initializing';
+  if (store.initError) return 'init-error';
   if (store.status.state === 'uninitialized') {
     return store.recoveryKeyPresented ? 'setup-recovery' : 'setup-passphrase';
   }
@@ -45,9 +53,10 @@ function cancelRecovery() {
   isRecoveryMode.value = false;
 }
 
-// Dev mock state toggle helper for verification
-function toggleMockState(state: 'uninitialized' | 'locked') {
-  store.resetMockState(state);
+// Development testing state switcher
+async function toggleMockState(state: 'uninitialized' | 'locked') {
+  setMockVaultState(state);
+  await store.init();
   isRecoveryMode.value = false;
 }
 </script>
@@ -95,6 +104,37 @@ function toggleMockState(state: 'uninitialized' | 'locked') {
         </p>
       </motion.div>
 
+      <!-- Lock Failure Warning Banner -->
+      <div
+        v-if="store.lockError"
+        role="alert"
+        class="w-full mb-4 p-3.5 rounded-lg border flex items-start justify-between gap-3 text-[12px]"
+        :style="{
+          background: 'var(--danger-muted)',
+          borderColor: 'var(--danger)',
+          color: 'var(--danger)',
+        }"
+      >
+        <div class="flex items-start gap-2.5">
+          <AlertTriangle :size="16" class="shrink-0 mt-0.5" />
+          <span>{{ store.lockError }}</span>
+        </div>
+        <button
+          type="button"
+          class="px-2.5 py-1 text-[11px] font-semibold rounded shrink-0 border transition-colors cursor-pointer"
+          :style="{
+            borderColor: 'var(--danger)',
+            background: 'var(--surface-primary)',
+            color: 'var(--danger)',
+          }"
+          :disabled="store.isLocking"
+          @click="store.retryLock()"
+        >
+          <span v-if="store.isLocking">Retrying...</span>
+          <span v-else>Retry Lock</span>
+        </button>
+      </div>
+
       <!-- Glass Shell Surface -->
       <GlassPanel
         depth="elevated"
@@ -107,9 +147,62 @@ function toggleMockState(state: 'uninitialized' | 'locked') {
       >
         <!-- Animated Card Transitions -->
         <AnimatePresence mode="wait">
-          <!-- Step 1: First-Run Passphrase Creation -->
+          <!-- State A: Initialization Loading Gate -->
           <motion.div
-            v-if="activeStep === 'setup-passphrase'"
+            v-if="activeStep === 'initializing'"
+            key="initializing"
+            :initial="{ opacity: 0 }"
+            :animate="{ opacity: 1 }"
+            :exit="{ opacity: 0 }"
+            :transition="{ duration: 0.2 }"
+            class="py-8 flex flex-col items-center text-center gap-3"
+          >
+            <AppSpinner :size="20" />
+            <h2 class="a-subheading font-medium" :style="{ color: 'var(--text-primary)' }">
+              Connecting to Vault Service
+            </h2>
+            <p class="a-supporting" :style="{ color: 'var(--text-tertiary)' }">
+              Establishing connection and verifying backend status...
+            </p>
+          </motion.div>
+
+          <!-- State B: Connection Error State with Retry -->
+          <motion.div
+            v-else-if="activeStep === 'init-error'"
+            key="init-error"
+            :initial="{ opacity: 0, scale: 0.96 }"
+            :animate="{ opacity: 1, scale: 1 }"
+            :exit="{ opacity: 0, scale: 0.96 }"
+            :transition="{ duration: 0.25 }"
+            class="py-4 flex flex-col items-center text-center gap-4"
+          >
+            <div
+              class="w-12 h-12 rounded-full flex items-center justify-center"
+              :style="{ background: 'var(--danger-muted)', color: 'var(--danger)' }"
+            >
+              <AlertTriangle :size="22" />
+            </div>
+            <div>
+              <h2 class="a-subheading font-semibold" :style="{ color: 'var(--text-primary)' }">
+                Backend Service Unavailable
+              </h2>
+              <p class="a-supporting mt-1.5" :style="{ color: 'var(--text-secondary)' }">
+                {{ store.initError }}
+              </p>
+            </div>
+            <AppButton
+              variant="primary"
+              size="md"
+              @click="store.init()"
+            >
+              <RefreshCw :size="13" />
+              <span>Retry Connection</span>
+            </AppButton>
+          </motion.div>
+
+          <!-- Step 1: First-Run Passphrase Creation (only when confirmed uninitialized) -->
+          <motion.div
+            v-else-if="activeStep === 'setup-passphrase'"
             key="setup-passphrase"
             :initial="{ opacity: 0, scale: 0.96, y: 8 }"
             :animate="{ opacity: 1, scale: 1, y: 0 }"
@@ -131,7 +224,7 @@ function toggleMockState(state: 'uninitialized' | 'locked') {
             <VaultRecoverySetupCard />
           </motion.div>
 
-          <!-- Step 3: Locked Vault Passphrase Unlock -->
+          <!-- Step 3: Locked Vault Passphrase Unlock (only when confirmed locked) -->
           <motion.div
             v-else-if="activeStep === 'unlock-passphrase'"
             key="unlock-passphrase"
@@ -168,7 +261,7 @@ function toggleMockState(state: 'uninitialized' | 'locked') {
           <Sparkles :size="11" :style="{ color: 'var(--gold)' }" />
           <span>Development Mock Adapter</span>
           <span>•</span>
-          <span class="font-mono uppercase">{{ store.status.state }}</span>
+          <span class="font-mono uppercase">{{ store.isInitializing ? 'connecting' : (store.initError ? 'unavailable' : store.status.state) }}</span>
         </div>
 
         <!-- Testing Switcher: allows reviewers to test both flows -->
@@ -186,8 +279,8 @@ function toggleMockState(state: 'uninitialized' | 'locked') {
             type="button"
             class="px-2 py-0.5 rounded transition-colors cursor-pointer"
             :style="{
-              background: store.status.state === 'uninitialized' ? 'var(--accent-primary)' : 'transparent',
-              color: store.status.state === 'uninitialized' ? 'var(--text-on-accent)' : 'var(--text-secondary)',
+              background: store.status.state === 'uninitialized' && !store.isInitializing ? 'var(--accent-primary)' : 'transparent',
+              color: store.status.state === 'uninitialized' && !store.isInitializing ? 'var(--text-on-accent)' : 'var(--text-secondary)',
               fontWeight: store.status.state === 'uninitialized' ? '600' : '400',
             }"
             @click="toggleMockState('uninitialized')"
@@ -198,8 +291,8 @@ function toggleMockState(state: 'uninitialized' | 'locked') {
             type="button"
             class="px-2 py-0.5 rounded transition-colors cursor-pointer"
             :style="{
-              background: store.status.state === 'locked' ? 'var(--accent-primary)' : 'transparent',
-              color: store.status.state === 'locked' ? 'var(--text-on-accent)' : 'var(--text-secondary)',
+              background: store.status.state === 'locked' && !store.isInitializing ? 'var(--accent-primary)' : 'transparent',
+              color: store.status.state === 'locked' && !store.isInitializing ? 'var(--text-on-accent)' : 'var(--text-secondary)',
               fontWeight: store.status.state === 'locked' ? '600' : '400',
             }"
             @click="toggleMockState('locked')"
