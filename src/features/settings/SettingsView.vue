@@ -14,9 +14,14 @@
  * toggle uses the shared ThemeToggle component so the Sidebar and Settings
  * share one animated knob aesthetic.
  */
-import { ref } from 'vue';
+import { onBeforeUnmount, ref } from 'vue';
 import { Sun, SlidersHorizontal, Info, Clock, CheckCircle2 } from 'lucide-vue-next';
 import { useTheme } from '@/composables/useTheme';
+import {
+  AUTO_LOCK_OPTIONS,
+  useSessionPreferences,
+  type AutoLockValue,
+} from '@/composables/useSessionPreferences';
 import PageContainer from '@/components/layout/PageContainer.vue';
 import PageHeader from '@/components/layout/PageHeader.vue';
 import Card from '@/components/ui/Card.vue';
@@ -28,20 +33,13 @@ import { MotionReveal } from '@/motion/components';
 
 const { theme } = useTheme();
 
-/** Simulated auto-lock options — frontend session preference only. */
-const AUTO_LOCK_OPTIONS = [
-  { value: 5,   label: '5 minutes' },
-  { value: 10,  label: '10 minutes' },
-  { value: 15,  label: '15 minutes' },
-  { value: 30,  label: '30 minutes' },
-  { value: 60,  label: '1 hour' },
-  { value: 0,   label: 'Never (not recommended)' },
-] as const;
+/**
+ * Shared session-preference state (src/composables/useSessionPreferences.ts):
+ * the same singleton refs SecurityView displays. Changing values here keeps
+ * both views consistent.
+ */
+const { autoLockTimeout, clearClipboardOnLock } = useSessionPreferences();
 
-type AutoLockValue = typeof AUTO_LOCK_OPTIONS[number]['value'];
-
-const autoLockTimeout = ref<AutoLockValue>(15);
-const clearClipboardOnLock = ref(true);
 const showSavedBanner = ref(false);
 let savedBannerTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -54,6 +52,15 @@ function savePreferences() {
     showSavedBanner.value = false;
   }, 2500);
 }
+
+// Clean up the pending banner timer so it never fires after unmount
+// (avoids writing to dead reactive state and stray timers in tests).
+onBeforeUnmount(() => {
+  if (savedBannerTimer) {
+    clearTimeout(savedBannerTimer);
+    savedBannerTimer = null;
+  }
+});
 
 function resetPreferences() {
   autoLockTimeout.value = 15;
@@ -167,20 +174,35 @@ function resetPreferences() {
               </select>
             </div>
 
-            <!-- Clear clipboard on lock -->
-            <div class="flex items-center justify-between gap-4 flex-wrap">
-              <div class="flex-1 min-w-0">
-                <p class="text-[13px] font-medium text-[var(--text-primary)]">Clear clipboard on lock</p>
+            <!-- Clear clipboard on lock — PROTOTYPE PREFERENCE ONLY:
+                 toggling does not perform any clipboard operation. -->
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+              <div class="flex-1 min-w-[240px]">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <p class="text-[13px] font-medium text-[var(--text-primary)]">Clear clipboard on lock</p>
+                  <span
+                    class="text-[9px] font-mono px-1.5 py-0.5 rounded"
+                    :style="{ color: 'var(--warning)', background: 'var(--warning-muted)' }"
+                  >
+                    NOT ACTIVE
+                  </span>
+                </div>
                 <p class="text-[11px] text-[var(--text-tertiary)] mt-0.5">
-                  Remove copied secrets from the clipboard when the vault locks
+                  Intended behaviour: remove copied secrets from the clipboard when the vault locks.
+                </p>
+                <p id="clipboard-preference-note" class="text-[10px] mt-1 leading-relaxed" :style="{ color: 'var(--warning)' }">
+                  Enabling this preference does not currently clear the operating-system clipboard.
+                  This is a prototype preference only — no clipboard operation is performed while the
+                  backend implementation is missing.
                 </p>
               </div>
               <button
                 type="button"
                 role="switch"
                 :aria-checked="clearClipboardOnLock"
-                :aria-label="clearClipboardOnLock ? 'Disable clear clipboard on lock' : 'Enable clear clipboard on lock'"
-                class="relative w-11 h-6 rounded-full border outline-none transition-colors shrink-0"
+                :aria-label="clearClipboardOnLock ? 'Disable clear clipboard on lock preference' : 'Enable clear clipboard on lock preference'"
+                aria-describedby="clipboard-preference-note"
+                class="relative mt-1 w-11 h-6 rounded-full border outline-none transition-colors shrink-0"
                 :style="{
                   background: clearClipboardOnLock ? 'var(--accent-primary)' : 'var(--surface-tertiary)',
                   borderColor: clearClipboardOnLock ? 'var(--accent-border)' : 'var(--border-default)',

@@ -8,6 +8,9 @@
  *    toggle button (top-left of the main area) slides it in as an overlay.
  *    A semi-transparent backdrop sits behind the open drawer; clicking it or
  *    pressing Escape closes the drawer.
+ *  - Drawer accessibility: role="dialog" + aria-modal, focus moves into the
+ *    drawer on open, Tab cycling is contained while open, and focus returns
+ *    to the hamburger when it closes.
  *
  * Motion (Layer 02): the active indicator is a single shared-layout element
  * (`layoutId`) that physically travels between destinations; nav rows get
@@ -18,7 +21,7 @@
  * Design tokens used in this file (verified by visualSystem.test.ts):
  *   var(--gold-surface), var(--gold), var(--gold-border), var(--gold-glow)
  */
-import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
+import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from 'vue';
 import type { Component } from 'vue';
 import { motion, AnimatePresence } from 'motion-v';
 import { Shield, LayoutGrid, Key, Fingerprint, Settings, Lock, Sun, Moon, Menu } from 'lucide-vue-next';
@@ -35,10 +38,57 @@ const { reduced } = useAppReducedMotion();
 
 const mobileOpen = ref(false);
 
+// Focus management: the hamburger that opens the drawer and the drawer panel
+// itself. Focus moves into the drawer when it opens, is contained while open,
+// and is restored to the hamburger when it closes.
+const hamburgerButtonRef = ref<HTMLButtonElement | null>(null);
+const drawerRef = ref<HTMLElement | null>(null);
 function openSidebar() { mobileOpen.value = true; }
 function closeSidebar() { mobileOpen.value = false; }
+
+/** Query all focusable elements within an element. */
+function getFocusable(root: HTMLElement): HTMLElement[] {
+  const selector =
+    'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])';
+  return Array.from(root.querySelectorAll<HTMLElement>(selector)).filter(
+    (el) => getComputedStyle(el).visibility !== 'hidden',
+  );
+}
+
+// Focus routing: into the drawer on open, back to the hamburger on close.
+// Done after the enter animation's first frame (nextTick) so the element
+// exists and is focusable.
+watch(mobileOpen, async (open) => {
+  if (open) {
+    await nextTick();
+    const focusables = drawerRef.value ? getFocusable(drawerRef.value) : [];
+    (focusables[0] ?? drawerRef.value)?.focus();
+  } else {
+    await nextTick();
+    hamburgerButtonRef.value?.focus();
+  }
+});
+
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape' && mobileOpen.value) closeSidebar();
+  if (e.key === 'Escape' && mobileOpen.value) {
+    closeSidebar();
+    return;
+  }
+  // Focus containment: keep Tab cycling inside the drawer while it is open.
+  if (e.key === 'Tab' && mobileOpen.value && drawerRef.value) {
+    const focusables = getFocusable(drawerRef.value);
+    if (focusables.length === 0) return;
+    const first = focusables[0]!;
+    const last = focusables[focusables.length - 1]!;
+    const active = document.activeElement;
+    if (e.shiftKey && (active === first || !drawerRef.value.contains(active))) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && active === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
 }
 
 onMounted(() => window.addEventListener('keydown', onKeydown));
@@ -87,6 +137,7 @@ async function handleLock() {
 <template>
   <!-- Mobile hamburger (visible below lg) -->
   <motion.button
+    ref="hamburgerButtonRef"
     type="button"
     :aria-label="mobileOpen ? 'Close navigation menu' : 'Open navigation menu'"
     :aria-expanded="mobileOpen"
@@ -235,8 +286,11 @@ async function handleLock() {
         borderColor: 'var(--border-subtle)',
         boxShadow: 'var(--shadow-xl)',
       }"
+      ref="drawerRef"
+      role="dialog"
+      aria-modal="true"
       aria-label="Application navigation"
-      role="navigation"
+      tabindex="-1"
     >
       <!-- Brand Mark (mobile drawer) -->
       <div class="px-5 pt-6 pb-5">

@@ -23,6 +23,7 @@
 import { computed } from 'vue';
 import { Shield, Lock, Key, CheckCircle2, AlertCircle, Clock, Database, ShieldOff } from 'lucide-vue-next';
 import { useVaultStore } from '@/stores/vaultStore';
+import { useSessionPreferences } from '@/composables/useSessionPreferences';
 import PageContainer from '@/components/layout/PageContainer.vue';
 import PageHeader from '@/components/layout/PageHeader.vue';
 import Card from '@/components/ui/Card.vue';
@@ -34,6 +35,13 @@ import { pageScroller } from '@/motion/composables/useScrollContainer';
 import { staggers } from '@/motion/tokens';
 
 const store = useVaultStore();
+
+/**
+ * Shared session-preference state — the same singleton refs the Settings
+ * view edits, so the displayed auto-lock value always matches the current
+ * selection instead of a hardcoded constant.
+ */
+const { autoLockLabel } = useSessionPreferences();
 
 function formatTimeAgo(dateStr: string): string {
   const date = new Date(dateStr);
@@ -70,7 +78,8 @@ const indicators = computed(() => [
   {
     id: 'autolock',
     label: 'Auto-lock timeout',
-    description: 'Frontend session preference is set to 15 minutes.',
+    // Reflects the shared session-preference state (editable in Settings).
+    description: `Frontend session preference is set to ${autoLockLabel.value}.`,
     status: 'ok' as const,
     note: 'Prototype: this preference is frontend state only and not enforced by the backend.',
   },
@@ -156,7 +165,7 @@ const protections = [
             </KeyValue>
             <KeyValue label="Auto-lock (prototype)">
               <span class="flex items-center gap-1.5">
-                <span class="text-[11px] tabular-nums text-[var(--text-primary)]">15 minutes</span>
+                <span class="text-[11px] tabular-nums text-[var(--text-primary)]">{{ autoLockLabel }}</span>
                 <span
                   class="text-[9px] font-mono px-1 py-0.5 rounded"
                   :style="{ color: 'var(--warning)', background: 'var(--warning-muted)' }"

@@ -3,8 +3,9 @@
  * SplitLayout — list/detail panel layout used by credential views.
  *
  * Responsive behaviour:
- *  - lg+ (≥1024 px): side-by-side panels. Sidebar is 360 px wide; detail
- *    panel takes the remaining flex space.
+ *  - lg+ (≥1024 px): side-by-side panels. Sidebar width is configurable via
+ *    the `sidebarWidth` prop (default 360 px); detail panel takes the
+ *    remaining flex space.
  *  - Below lg: stacked. When nothing is selected the sidebar fills the full
  *    width. Selecting a credential hides the sidebar and shows the detail
  *    panel full-width. A visible "Back" bar at the top of the detail panel
@@ -18,24 +19,34 @@ import { computed } from 'vue';
 import { ArrowLeft } from 'lucide-vue-next';
 import { useVaultStore } from '@/stores/vaultStore';
 
-withDefaults(defineProps<{ sidebarWidth?: string }>(), {
+const props = withDefaults(defineProps<{ sidebarWidth?: string }>(), {
   sidebarWidth: '360px',
 });
 
 const store = useVaultStore();
 const hasSelection = computed(() => store.selectedCredential !== null);
+
+/**
+ * Desktop sidebar width is driven by the public `sidebarWidth` prop through a
+ * CSS custom property: `lg:w-[var(--sidebar-width)]` is a static class
+ * (generatable by Tailwind) while the actual width stays caller-configurable.
+ * Mobile behaviour (full-width / hidden stacking) is unchanged.
+ */
+const sidebarStyle = computed(() => ({
+  '--sidebar-width': props.sidebarWidth,
+  borderColor: 'var(--border-subtle)',
+  background: 'var(--surface-primary)',
+}));
 </script>
 
 <template>
   <div class="h-full flex overflow-hidden">
-    <!-- Sidebar panel -->
+    <!-- Sidebar panel — desktop width comes from the sidebarWidth prop via
+       --sidebar-width; below lg the responsive stacking classes apply. -->
     <div
-      class="flex flex-col overflow-hidden border-r shrink-0 lg:w-[360px]"
+      class="flex flex-col overflow-hidden border-r shrink-0 lg:w-[var(--sidebar-width)]"
       :class="hasSelection ? 'hidden lg:flex' : 'flex w-full'"
-      :style="{
-        borderColor: 'var(--border-subtle)',
-        background: 'var(--surface-primary)',
-      }"
+      :style="sidebarStyle"
     >
       <slot name="sidebar" />
     </div>
