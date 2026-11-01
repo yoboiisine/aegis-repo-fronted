@@ -13,11 +13,29 @@ import type {
   UpdateCredentialInput,
   PageId,
 } from '@/types';
-import { vaultClient } from '@/services/api/vaultClient';
+import type { VaultClient, CreateVaultResult } from '@/services/api/contracts';
+import { vaultClient as defaultVaultClient } from '@/services/api/vaultClient';
+
+let activeClient: VaultClient = defaultVaultClient;
+
+/**
+ * Dependency injection hook for test environments and alternative client bindings.
+ */
+export function setVaultClient(client: VaultClient): void {
+  activeClient = client;
+}
+
+export function getVaultClient(): VaultClient {
+  return activeClient;
+}
 
 export const useVaultStore = defineStore('vault', () => {
   // State
+  // Status starts as a locked placeholder but is gated by isInitializing
   const status = ref<VaultStatus>({ state: 'locked' });
+  const isInitializing = ref(true);
+  const initError = ref<string | null>(null);
+
   const credentials = ref<CredentialSummary[]>([]);
   const passwords = ref<CredentialSummary[]>([]);
   const apiKeys = ref<CredentialSummary[]>([]);
@@ -35,10 +53,26 @@ export const useVaultStore = defineStore('vault', () => {
   const error = ref<string | null>(null);
   const isCreating = ref(false);
   const isUnlocking = ref(false);
+  const isRecovering = ref(false);
+  const isLocking = ref(false);
+  const lockError = ref<string | null>(null);
+  const isReconciling = ref(false);
+  const reconciliationError = ref<string | null>(null);
+  const recoveryKeyPresented = ref<string | null>(null);
   const currentPage = ref<PageId>('overview');
 
-  // Computed
-  const isUnlocked = computed(() => status.value.state === 'unlocked');
+  let pendingInitPromise: Promise<void> | null = null;
+
+  // Computed — strictly gated on confirmed backend status without connection errors
+  const isUnlocked = computed(
+    () => !isInitializing.value && !initError.value && status.value.state === 'unlocked',
+  );
+  const isUninitialized = computed(
+    () => !isInitializing.value && !initError.value && status.value.state === 'uninitialized',
+  );
+  const isLocked = computed(
+    () => !isInitializing.value && !initError.value && status.value.state === 'locked',
+  );
 
   function applyFilters(items: CredentialSummary[]): CredentialSummary[] {
     return items
@@ -83,52 +117,247 @@ export const useVaultStore = defineStore('vault', () => {
     notifications.value = notifications.value.filter(n => n.id !== id);
   }
 
-  async function init() {
-    const s = await vaultClient.getVaultStatus();
-    status.value = s;
+  async function init(): Promise<void> {
+    if (pendingInitPromise) {
+      return pendingInitPromise;
+    }
+
+    isInitializing.value = true;
+    initError.value = null;
+    error.value = null;
+    reconciliationError.value = null;
+
+    pendingInitPromise = (async () => {
+      try {
+        const s = await activeClient.getVaultStatus();
+        status.value = s;
+      } catch {
+        initError.value = 'Failed to connect to the backend vault service. Please verify that the backend is running.';
+      } finally {
+        isInitializing.value = false;
+        pendingInitPromise = null;
+      }
+    })();
+
+    return pendingInitPromise;
+  }
+
+  /**
+   * Reconciles authoritative vault status from the backend service.
+   * Separates status synchronization from raw authentication execution.
+   */
+  async function reconcileStatus(): Promise<boolean> {
+    isReconciling.value = true;
+    reconciliationError.value = null;
+    try {
+      const s = await activeClient.getVaultStatus();
+      status.value = s;
+      return true;
+    } catch {
+      reconciliationError.value =
+        'Authentication succeeded, but client failed to confirm updated session status from backend. Click below to retry synchronization.';
+      return false;
+    } finally {
+      isReconciling.value = false;
+    }
+  }
+
+  async function setupVault(passphrase: string, confirm: string): Promise<CreateVaultResult> {
+    if (isInitializing.value || !isUninitialized.value) {
+      return { success: false, error: 'Vault is not ready for initialization.' };
+    }
+    isCreating.value = true;
+    error.value = null;
+    reconciliationError.value = null;
+    try {
+      const result = await activeClient.createVault(passphrase, confirm);
+      if (result.success) {
+        if (result.recoveryKey) {
+          // Store in reactive memory for the presentation step; never persisted
+          recoveryKeyPresented.value = result.recoveryKey;
+        } else {
+          // If backend did not supply a recovery key, complete directly
+          await completeSetup();
+        }
+        return result;
+      } else {
+        error.value = result.error ?? 'Failed to initialize vault';
+        return result;
+      }
+    } catch {
+      error.value = 'An error occurred during vault creation';
+      return { success: false, error: 'An error occurred during vault creation' };
+    } finally {
+      isCreating.value = false;
+    }
+  }
+
+  async function completeSetup(): Promise<boolean> {
+    error.value = null;
+    try {
+      const s = await activeClient.getVaultStatus();
+      status.value = s;
+      // ONLY clear the presented recovery key once the transition to unlocked status is confirmed!
+      recoveryKeyPresented.value = null;
+      notify({ type: 'success', title: 'Vault created and unlocked' });
+      return true;
+    } catch {
+      // Retain recoveryKeyPresented so the user does NOT lose their key if status fetch fails!
+      error.value =
+        'Vault was created, but failed to confirm updated status. Your recovery key is retained above. Please retry completing setup.';
+      notify({
+        type: 'warning',
+        title: 'Status Confirmation Failed',
+        message: 'Could not confirm vault status. Your recovery key is retained. Please retry.',
+      });
+      return false;
+    }
+  }
+
+  function cancelSetup() {
+    recoveryKeyPresented.value = null;
+    error.value = null;
+    reconciliationError.value = null;
   }
 
   async function unlock(passphrase: string): Promise<boolean> {
+    if (isInitializing.value || !isLocked.value) {
+      return false;
+    }
     isUnlocking.value = true;
     error.value = null;
+    reconciliationError.value = null;
+
+    let authSuccess = false;
     try {
-      const result = await vaultClient.unlockVault(passphrase);
+      const result = await activeClient.unlockVault(passphrase);
       if (result.success) {
-        const s = await vaultClient.getVaultStatus();
-        status.value = s;
-        notify({ type: 'success', title: 'Vault unlocked' });
-        return true;
+        authSuccess = true;
       } else {
         error.value = result.error ?? 'Invalid passphrase';
         return false;
       }
     } catch {
-      error.value = 'Failed to unlock vault';
+      error.value = 'Failed to execute unlock operation';
       return false;
     } finally {
       isUnlocking.value = false;
     }
+
+    if (authSuccess) {
+      // Distinguish authentication success from status synchronization
+      const reconciled = await reconcileStatus();
+      if (reconciled) {
+        notify({ type: 'success', title: 'Vault unlocked' });
+        return true;
+      } else {
+        notify({
+          type: 'warning',
+          title: 'Session Unsynchronized',
+          message: 'Vault was unlocked on backend, but status could not be synchronized.',
+        });
+        return false;
+      }
+    }
+    return false;
   }
 
-  async function lock() {
-    await vaultClient.lockVault();
-    status.value = { state: 'locked' };
+  async function recover(recoveryKey: string): Promise<boolean> {
+    if (isInitializing.value || !isLocked.value) {
+      return false;
+    }
+    isRecovering.value = true;
+    error.value = null;
+    reconciliationError.value = null;
+
+    let authSuccess = false;
+    try {
+      if (typeof activeClient.recoverVault !== 'function') {
+        error.value = 'Emergency recovery is not supported by the active backend.';
+        return false;
+      }
+      const result = await activeClient.recoverVault(recoveryKey);
+      if (result.success) {
+        authSuccess = true;
+      } else {
+        error.value = result.error ?? 'Invalid recovery key';
+        return false;
+      }
+    } catch {
+      error.value = 'Failed to execute recovery operation';
+      return false;
+    } finally {
+      isRecovering.value = false;
+    }
+
+    if (authSuccess) {
+      // Distinguish authentication success from status synchronization
+      const reconciled = await reconcileStatus();
+      if (reconciled) {
+        notify({ type: 'success', title: 'Vault recovered successfully' });
+        return true;
+      } else {
+        notify({
+          type: 'warning',
+          title: 'Session Unsynchronized',
+          message: 'Vault was recovered on backend, but status could not be synchronized.',
+        });
+        return false;
+      }
+    }
+    return false;
+  }
+
+  async function lock(): Promise<boolean> {
+    // Concurrency guard: ignore duplicate simultaneous lock requests
+    if (isLocking.value) {
+      return false;
+    }
+
+    isLocking.value = true;
+    lockError.value = null;
+    reconciliationError.value = null;
+
+    // Immediate reactive state hygiene: scrub cached credentials and keys from frontend memory
     credentials.value = [];
     passwords.value = [];
     apiKeys.value = [];
     selectedCredential.value = null;
     activity.value = [];
-    error.value = null;
+    recoveryKeyPresented.value = null;
     currentPage.value = 'overview';
+
+    try {
+      await activeClient.lockVault();
+      // Only set status to locked after backend confirms session disposal
+      status.value = { state: 'locked' };
+      notify({ type: 'info', title: 'Vault locked' });
+      return true;
+    } catch {
+      lockError.value =
+        'Backend failed to terminate vault session. Sensitive frontend state was purged, but backend lock could not be confirmed.';
+      notify({
+        type: 'error',
+        title: 'Lock Unconfirmed',
+        message: 'Backend session could not be terminated. Please retry.',
+      });
+      return false;
+    } finally {
+      isLocking.value = false;
+    }
+  }
+
+  async function retryLock(): Promise<boolean> {
+    return lock();
   }
 
   async function loadAll() {
     isLoading.value = true;
     try {
       const [creds, pwds, keys] = await Promise.all([
-        vaultClient.listCredentials(),
-        vaultClient.listPasswords(),
-        vaultClient.listApiKeys(),
+        activeClient.listCredentials(),
+        activeClient.listPasswords(),
+        activeClient.listApiKeys(),
       ]);
       credentials.value = creds;
       passwords.value = pwds;
@@ -142,7 +371,7 @@ export const useVaultStore = defineStore('vault', () => {
 
   async function loadActivity() {
     try {
-      activity.value = await vaultClient.getActivity();
+      activity.value = await activeClient.getActivity();
     } catch { /* non-critical */ }
   }
 
@@ -152,7 +381,7 @@ export const useVaultStore = defineStore('vault', () => {
       return;
     }
     try {
-      selectedCredential.value = await vaultClient.getCredential(id);
+      selectedCredential.value = await activeClient.getCredential(id);
     } catch {
       notify({ type: 'error', title: 'Failed to load credential' });
     }
@@ -161,7 +390,7 @@ export const useVaultStore = defineStore('vault', () => {
   async function createCredential(input: CreateCredentialInput): Promise<CredentialSummary> {
     isCreating.value = true;
     try {
-      const summary = await vaultClient.createCredential(input);
+      const summary = await activeClient.createCredential(input);
       credentials.value = [summary, ...credentials.value];
       if (input.kind === 'api-key' || input.kind === 'access-token') {
         apiKeys.value = [summary, ...apiKeys.value];
@@ -180,7 +409,7 @@ export const useVaultStore = defineStore('vault', () => {
 
   async function updateCredential(id: string, input: UpdateCredentialInput): Promise<CredentialSummary> {
     try {
-      const summary = await vaultClient.updateCredential(id, input);
+      const summary = await activeClient.updateCredential(id, input);
       credentials.value = credentials.value.map(c => c.id === id ? summary : c);
       passwords.value = passwords.value.map(c => c.id === id ? summary : c);
       apiKeys.value = apiKeys.value.map(c => c.id === id ? summary : c);
@@ -197,7 +426,7 @@ export const useVaultStore = defineStore('vault', () => {
 
   async function deleteCredential(id: string) {
     try {
-      await vaultClient.deleteCredential(id);
+      await activeClient.deleteCredential(id);
       credentials.value = credentials.value.filter(c => c.id !== id);
       passwords.value = passwords.value.filter(c => c.id !== id);
       apiKeys.value = apiKeys.value.filter(c => c.id !== id);
@@ -218,11 +447,13 @@ export const useVaultStore = defineStore('vault', () => {
   }
 
   return {
-    status, credentials, passwords, apiKeys, selectedCredential,
+    status, isInitializing, initError, credentials, passwords, apiKeys, selectedCredential,
     activity, notifications, filters, isLoading, error,
-    isCreating, isUnlocking, currentPage,
-    isUnlocked, filteredPasswords, filteredApiKeys,
-    notify, dismissNotification, init, unlock, lock,
+    isCreating, isUnlocking, isRecovering, isLocking, lockError,
+    isReconciling, reconciliationError, recoveryKeyPresented, currentPage,
+    isUnlocked, isUninitialized, isLocked, filteredPasswords, filteredApiKeys,
+    notify, dismissNotification, init, reconcileStatus, setupVault, completeSetup, cancelSetup,
+    unlock, recover, lock, retryLock,
     loadAll, loadActivity, selectCredential,
     createCredential, updateCredential, deleteCredential,
     setFilters, navigate,

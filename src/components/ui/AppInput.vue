@@ -19,6 +19,9 @@ interface Props {
   disabled?: boolean
   error?: string
   id?: string
+  type?: string
+  autocomplete?: string
+  autofocus?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -26,6 +29,9 @@ const props = withDefaults(defineProps<Props>(), {
   size: 'md',
   disabled: false,
   error: undefined,
+  type: 'text',
+  autocomplete: 'off',
+  autofocus: false,
 })
 
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
@@ -33,6 +39,12 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 const fallbackId = `input-${Math.random().toString(36).slice(2, 9)}`
 const inputId = computed(() => props.id ?? fallbackId)
 const focused = ref(false)
+const inputEl = ref<HTMLInputElement | null>(null)
+
+defineExpose({
+  focus: () => inputEl.value?.focus(),
+  blur: () => inputEl.value?.blur(),
+})
 
 const classes = computed(
   () => `${controlBaseClass} ${controlSizeClasses[props.size]}`,
@@ -54,11 +66,15 @@ const style = computed(() => ({
     >{{ label }}</label>
     <input
       :id="inputId"
+      ref="inputEl"
+      :type="type"
       :class="classes"
       :style="style"
       :value="modelValue"
       :placeholder="placeholder"
       :disabled="disabled"
+      :autofocus="autofocus"
+      :autocomplete="autocomplete"
       :aria-invalid="error ? true : undefined"
       :aria-describedby="error ? `${inputId}-error` : undefined"
       @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"

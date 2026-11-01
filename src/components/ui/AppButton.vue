@@ -15,6 +15,7 @@ import { useAppReducedMotion } from '@/motion/composables/useReducedMotion';
 interface Props {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'glass' | 'gold';
   size?: 'sm' | 'md' | 'lg';
+  type?: 'button' | 'submit' | 'reset';
   loading?: boolean;
   disabled?: boolean;
 }
@@ -24,6 +25,7 @@ const { reduced } = useAppReducedMotion();
 const props = withDefaults(defineProps<Props>(), {
   variant: 'secondary',
   size: 'md',
+  type: 'button',
   loading: false,
   disabled: false,
 });
@@ -84,7 +86,7 @@ const styles = computed(() => {
 
 <template>
   <motion.button
-    type="button"
+    :type="type"
     :class="styles.class"
     :style="styles.style"
     :disabled="disabled || loading"

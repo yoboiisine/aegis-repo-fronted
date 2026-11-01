@@ -35,9 +35,9 @@ export const navItemInteraction = {
 
 /** Reveal/copy micro controls: quick state pop on success. */
 export const confirmPop = {
-  scale: [1, 1.18, 1],
+  scale: [1, 1.18, 1] as number[],
   transition: { duration: durations.component, ease: easings.out },
-} as const
+}
 
 /** Atmospheric entrance for the locked environment background layers. */
 export const atmosphereEnter = (layer: number) => ({
@@ -57,11 +57,11 @@ export const atmosphereEnter = (layer: number) => ({
  *  reduced-motion static alternative in UnlockView. */
 export const emblemPulse = {
   animate: {
-    scale: [1, 1.03, 1],
-    opacity: [1, 0.92, 1],
+    scale: [1, 1.03, 1] as number[],
+    opacity: [1, 0.92, 1] as number[],
     transition: { duration: 4.5, ease: easings.inOut, repeat: Infinity },
   },
-} as const
+}
 
 /** Theme-switch surface response — used by ThemeToggle and any control that
  *  mutates global theme state. A single quick scale "breath" gives the toggle
@@ -70,10 +70,10 @@ export const emblemPulse = {
 export const themeSurfaceTransition = {
   initial: false,
   animate: {
-    scale: [1, 0.96, 1],
+    scale: [1, 0.96, 1] as number[],
     transition: { duration: durations.control, ease: easings.out },
   },
-} as const
+}
 
 /** Verification-in-progress indicator: one confident sweep, not a spinner
  *  theatre. Driven by state, so it never fabricates success. */

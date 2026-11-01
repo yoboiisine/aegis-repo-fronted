@@ -9,10 +9,30 @@ import type {
   ActivityEvent,
 } from '@/types';
 
+export interface CreateVaultResult {
+  success: boolean;
+  error?: string;
+  /**
+   * Optional recovery key returned by the backend upon vault creation.
+   * If omitted by the backend, the frontend does not fabricate one.
+   */
+  recoveryKey?: string;
+}
+
+export interface RecoverVaultResult {
+  success: boolean;
+  error?: string;
+}
+
 export interface VaultClient {
   getVaultStatus(): Promise<VaultStatus>;
   unlockVault(passphrase: string): Promise<{ success: boolean; error?: string }>;
-  createVault(passphrase: string, confirmPassphrase: string): Promise<{ success: boolean; error?: string }>;
+  createVault(passphrase: string, confirmPassphrase: string): Promise<CreateVaultResult>;
+  /**
+   * Emergency recovery integration boundary.
+   * Defined as an optional method when backed by recovery-capable backends.
+   */
+  recoverVault?(recoveryKey: string): Promise<RecoverVaultResult>;
   lockVault(): Promise<void>;
   listCredentials(): Promise<CredentialSummary[]>;
   listPasswords(): Promise<CredentialSummary[]>;
