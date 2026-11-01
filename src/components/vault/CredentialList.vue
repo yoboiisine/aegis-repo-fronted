@@ -938,33 +938,31 @@ async function handleDelete() {
 
   <!-- Create Credential Modal -->
   <ModalShell :open="showCreateModal" maxWidth="34rem" @close="showCreateModal = false">
-    <div class="p-6">
-      <div class="flex items-center justify-between pb-4 mb-4 border-b border-[var(--border-subtle)]">
-        <div>
-          <h2 class="text-[16px] font-semibold text-[var(--text-primary)]">
-            New Credential
-          </h2>
-          <p class="text-[12px] text-[var(--text-tertiary)] mt-0.5">
-            Store a new secure password, key, token, or encrypted note.
-          </p>
-        </div>
-        <button
-          type="button"
-          @click="showCreateModal = false"
-          class="p-1.5 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
-        >
-          <X :size="16" />
-        </button>
+    <div class="flex items-center justify-between pb-4 mb-4 border-b border-[var(--border-subtle)]">
+      <div>
+        <h2 class="text-[16px] font-semibold text-[var(--text-primary)]">
+          New Credential
+        </h2>
+        <p class="text-[12px] text-[var(--text-tertiary)] mt-0.5">
+          Store a new secure password, key, token, or encrypted note.
+        </p>
       </div>
-
-      <CredentialForm
-        :default-kind="props.defaultKind"
-        :allowed-kinds="props.allowedKinds"
-        :is-edit="false"
-        @submit="handleCreate"
-        @cancel="showCreateModal = false"
-      />
+      <button
+        type="button"
+        @click="showCreateModal = false"
+        class="p-1.5 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+      >
+        <X :size="16" />
+      </button>
     </div>
+
+    <CredentialForm
+      :default-kind="props.defaultKind"
+      :allowed-kinds="props.allowedKinds"
+      :is-edit="false"
+      @submit="handleCreate"
+      @cancel="showCreateModal = false"
+    />
   </ModalShell>
 
   <!-- Edit Credential Modal -->
@@ -973,7 +971,7 @@ async function handleDelete() {
     maxWidth="34rem"
     @close="showEditModal = false"
   >
-    <div v-if="store.selectedCredential" class="p-6">
+    <template v-if="store.selectedCredential">
       <div class="flex items-center justify-between pb-4 mb-4 border-b border-[var(--border-subtle)]">
         <div>
           <h2 class="text-[16px] font-semibold text-[var(--text-primary)]">
@@ -999,7 +997,7 @@ async function handleDelete() {
         @submit="handleUpdate"
         @cancel="showEditModal = false"
       />
-    </div>
+    </template>
   </ModalShell>
 
   <!-- Delete Confirmation Dialog -->
